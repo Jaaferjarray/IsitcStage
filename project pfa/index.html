@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ISITCStage — Gestion des Stages Universitaires</title>
+  <meta name="description" content="ISITCStage — plateforme de gestion des stages pour l'ISITC Sousse." />
+  <link rel="icon" href="res/primary logo.png" type="image/png" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div id="toast-container"></div>
+
+<!-- ═══════════ PAGE D'ACCUEIL ═══════════ -->
+<div id="page-accueil" class="page active">
+  <nav class="nav-bar">
+    <div class="nav-logo"><img src="res/primary logo.png" alt="ISITCStage"/><div class="nav-logo-text">ISITC<span>Stage</span></div></div>
+    <div class="nav-links">
+      <a onclick="showPage('page-connexion')">Connexion</a>
+      <button class="nav-cta" onclick="showPage('page-inscription')">S'inscrire</button>
+    </div>
+  </nav>
+  <section class="hero">
+    <div class="hero-content">
+      <img src="res/primary logo.png" alt="Logo" class="hero-logo"/>
+      <div class="hero-badge">🎓 Plateforme Officielle ISITC Sousse</div>
+      <h1>Gérez vos stages universitaires<br/><span>en toute simplicité</span></h1>
+      <p>ISITCStage simplifie la gestion des stages pour les étudiants, encadrants et administrateurs.</p>
+      <div class="hero-btns">
+        <button class="btn btn-primary" style="font-size:1rem;padding:14px 28px" onclick="showPage('page-inscription')">Commencer maintenant →</button>
+        <button class="btn btn-outline" style="font-size:1rem;padding:14px 28px" onclick="showPage('page-connexion')">Se connecter</button>
+      </div>
+    </div>
+  </section>
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-number">ISITC</div><div class="stat-label">Sousse</div></div>
+    <div class="stat-card"><div class="stat-number">PFA</div><div class="stat-label">Projet Fin d'Année</div></div>
+    <div class="stat-card"><div class="stat-number">3</div><div class="stat-label">Rôles</div></div>
+    <div class="stat-card"><div class="stat-number">100%</div><div class="stat-label">Numérique</div></div>
+  </div>
+  <section class="features-section">
+    <div class="section-header"><h2>Une plateforme pour tous les acteurs</h2><p>Des outils adaptés à chaque profil pour une gestion fluide.</p></div>
+    <div class="features-grid">
+      <div class="feat-card"><div class="feat-icon">🎓</div><h3>Espace Étudiant</h3><p>Trouvez un encadrant, envoyez vos demandes, déposez vos rapports et suivez votre stage.</p></div>
+      <div class="feat-card"><div class="feat-icon">👨‍🏫</div><h3>Espace Encadrant</h3><p>Gérez vos étudiants, acceptez les demandes, évaluez les rapports et attribuez des notes.</p></div>
+      <div class="feat-card"><div class="feat-icon">⚙️</div><h3>Espace Admin</h3><p>Supervisez la plateforme, ajoutez des encadrants, planifiez les soutenances.</p></div>
+    </div>
+  </section>
+  <footer class="landing-footer"><p>© 2025 <span>ISITCStage</span> — ISITC Sousse. Tous droits réservés.</p></footer>
+</div>
+
+<!-- ═══════════ PAGE CONNEXION ═══════════ -->
+<div id="page-connexion" class="page">
+  <div class="auth-page">
+    <div class="auth-card">
+      <img src="res/primary logo.png" alt="ISITCStage" class="auth-logo-img"/>
+      <h2 class="auth-title">Connexion</h2>
+      <p class="auth-subtitle">Connectez-vous à votre espace ISITCStage</p>
+      <form id="login-form" onsubmit="handleLogin(event)" novalidate>
+        <div class="form-group"><label>Email</label><div class="input-wrap"><span class="icon">📧</span><input type="email" id="login-email" placeholder="votre@isitc.u-sousse.tn" autocomplete="email"/></div></div>
+        <div class="form-group"><label>Mot de passe</label><div class="input-wrap"><span class="icon">🔒</span><input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password"/><span class="eye-toggle" onclick="togglePwd('login-password',this)">👁</span></div></div>
+        <button type="submit" id="login-btn" class="btn btn-gradient btn-full">→ Se connecter</button>
+      </form>
+      <div class="auth-divider">Comptes de démonstration</div>
+      <div class="demo-box">
+        <div class="demo-label">Accès rapide</div>
+        <div class="demo-account" onclick="fillDemo('jaafer.jarray@isitc.u-sousse.tn','jaafer1234')">
+          <div class="demo-account-info"><span class="demo-role">Administrateur</span><span class="demo-name">Jaafer Jarray</span><span class="demo-email">jaafer.jarray@isitc.u-sousse.tn</span></div>
+          <span class="demo-fill">Remplir →</span>
+        </div>
+      </div>
+      <div class="auth-link-row" style="margin-top:16px">Pas encore de compte ? <a onclick="showPage('page-inscription')">S'inscrire</a></div>
+      <div class="auth-link-row"><a onclick="showPage('page-accueil')">← Retour à l'accueil</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ PAGE INSCRIPTION (ÉTUDIANT) ═══════════ -->
+<div id="page-inscription" class="page">
+  <div class="auth-page">
+    <div class="auth-card">
+      <img src="res/primary logo.png" alt="ISITCStage" class="auth-logo-img"/>
+      <h2 class="auth-title">Inscription Étudiant</h2>
+      <p class="auth-subtitle">Créez votre compte étudiant sur ISITCStage</p>
+      <div class="auth-note">ℹ️ Les comptes encadrants sont créés uniquement par l'administrateur.</div>
+      <form id="register-form" onsubmit="handleRegister(event)" novalidate>
+        <div class="form-row">
+          <div class="form-group" style="margin-bottom:0"><label>Prénom</label><div class="input-wrap"><span class="icon">👤</span><input type="text" id="reg-prenom" placeholder="Votre prénom"/></div></div>
+          <div class="form-group" style="margin-bottom:0"><label>Nom</label><div class="input-wrap"><span class="icon">👤</span><input type="text" id="reg-nom" placeholder="Votre nom"/></div></div>
+        </div>
+        <div class="form-group" style="margin-top:16px"><label>Email universitaire</label><div class="input-wrap"><span class="icon">📧</span><input type="email" id="reg-email" placeholder="prenom.nom@isitc.u-sousse.tn"/></div></div>
+        <div class="form-group"><label>Niveau d'étude</label>
+          <select id="reg-niveau"><option>Licence 1</option><option>Licence 2</option><option selected>Licence 3</option><option>Master 1</option><option>Master 2</option></select>
+        </div>
+        <div class="form-group"><label>Mot de passe</label><div class="input-wrap"><span class="icon">🔒</span><input type="password" id="reg-password" placeholder="Min. 6 caractères"/><span class="eye-toggle" onclick="togglePwd('reg-password',this)">👁</span></div></div>
+        <div class="form-group"><label>Confirmer le mot de passe</label><div class="input-wrap"><span class="icon">🔒</span><input type="password" id="reg-confirm" placeholder="••••••••"/><span class="eye-toggle" onclick="togglePwd('reg-confirm',this)">👁</span></div></div>
+        <button type="submit" id="register-btn" class="btn btn-gradient btn-full">🎓 Créer mon compte</button>
+      </form>
+      <div class="auth-link-row">Déjà un compte ? <a onclick="showPage('page-connexion')">Se connecter</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ DASHBOARD ÉTUDIANT ═══════════ -->
+<div id="dashboard-etudiant" class="page">
+  <div class="dashboard">
+    <aside class="sidebar">
+      <div class="sidebar-logo-wrap"><img src="res/primary logo.png" alt="Logo"/><div class="sidebar-logo-text">ISITC<span>Stage</span><span class="sidebar-role-label">Espace Étudiant</span></div></div>
+      <div class="sidebar-divider"></div>
+      <nav class="sidebar-nav" id="sidebar-etudiant">
+        <a class="active" onclick="showSection('etud-accueil','sidebar-etudiant')"><span class="nav-icon">🏠</span><span>Accueil</span></a>
+        <a onclick="showSection('etud-encadrants','sidebar-etudiant')"><span class="nav-icon">👥</span><span>Encadrants</span></a>
+        <a onclick="showSection('etud-rapport','sidebar-etudiant')"><span class="nav-icon">📄</span><span>Mon Rapport</span></a>
+        <a onclick="showSection('etud-demandes','sidebar-etudiant')"><span class="nav-icon">📬</span><span>Mes Demandes</span></a>
+        <a onclick="showSection('etud-params','sidebar-etudiant')"><span class="nav-icon">⚙️</span><span>Paramètres</span></a>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="sidebar-user"><div class="sidebar-avatar" id="etud-avatar">ET</div><div class="sidebar-user-info"><div class="sidebar-user-name" id="etud-sidebar-name">Étudiant</div><div class="sidebar-user-role">Étudiant</div></div></div>
+        <button class="btn-logout" onclick="handleLogout()">🚪 Déconnexion</button>
+      </div>
+    </aside>
+    <main class="dash-main">
+      <div class="page-topbar"><div class="topbar-title" id="etud-topbar-title">Tableau de bord</div><div class="topbar-date" id="current-date-etud"></div></div>
+
+      <!-- ETUD: ACCUEIL -->
+      <div id="etud-accueil" class="dash-section active">
+        <div class="welcome-banner"><div class="welcome-text"><h2>Bonjour, <span id="etud-prenom">Étudiant</span> 👋</h2><p>Bienvenue sur votre espace ISITCStage</p></div><div class="welcome-emoji">🎓</div></div>
+        <div class="kpi-grid">
+          <div class="kpi-card"><div class="kpi-icon blue">📬</div><div class="kpi-info"><div class="kpi-value" id="etud-kpi-demandes">0</div><div class="kpi-label">Demandes envoyées</div></div></div>
+          <div class="kpi-card"><div class="kpi-icon orange">📄</div><div class="kpi-info"><div class="kpi-value" id="etud-kpi-rapport">Non</div><div class="kpi-label">Rapport déposé</div></div></div>
+          <div class="kpi-card"><div class="kpi-icon green">⭐</div><div class="kpi-info"><div class="kpi-value" id="etud-kpi-note">—</div><div class="kpi-label">Note obtenue</div></div></div>
+        </div>
+        <div class="quick-actions">
+          <div class="qa-btn" onclick="showSection('etud-encadrants','sidebar-etudiant')"><div class="qa-icon">👥</div><span>Trouver un encadrant</span></div>
+          <div class="qa-btn" onclick="showSection('etud-rapport','sidebar-etudiant')"><div class="qa-icon">📄</div><span>Déposer mon rapport</span></div>
+          <div class="qa-btn" onclick="showSection('etud-demandes','sidebar-etudiant')"><div class="qa-icon">📬</div><span>Mes demandes</span></div>
+        </div>
+      </div>
+
+      <!-- ETUD: ENCADRANTS -->
+      <div id="etud-encadrants" class="dash-section">
+        <div class="dash-header"><h1>Encadrants disponibles</h1><p>Envoyez une demande à l'encadrant de votre choix</p></div>
+        <div class="search-bar"><div class="search-input-wrap"><input type="text" placeholder="Rechercher un encadrant..." oninput="filterEncadrants(this.value)"/></div></div>
+        <div class="cards-grid" id="enc-cards-grid"><div class="empty-state"><div class="empty-icon">👥</div><p>Chargement...</p></div></div>
+      </div>
+
+      <!-- ETUD: RAPPORT -->
+      <div id="etud-rapport" class="dash-section">
+        <div class="dash-header"><h1>Mon Rapport de Stage</h1><p>Déposez votre rapport pour évaluation</p></div>
+        <div id="rapport-upload-zone">
+          <div class="upload-zone" onclick="document.getElementById('rapport-file-input').click()">
+            <div class="upload-icon">📁</div><p>Cliquer pour déposer votre rapport (PDF)</p><small>Formats acceptés : PDF · Taille max : 20 MB</small>
+            <input type="file" id="rapport-file-input" accept=".pdf" style="display:none" onchange="handleRapportUpload(this)"/>
+          </div>
+          <div style="text-align:center;margin-top:16px"><button class="btn btn-primary" onclick="document.getElementById('rapport-file-input').click()">📤 Déposer le rapport</button></div>
+        </div>
+        <div id="rapport-deposited" style="display:none">
+          <div class="rapport-info" style="background:#fff;border-radius:14px;padding:24px;border:1.5px solid var(--green);display:flex;align-items:center;gap:16px">
+            <div style="font-size:2rem">📋</div>
+            <div style="flex:1"><div style="font-weight:700;color:var(--navy);margin-bottom:4px" id="rapport-filename">rapport.pdf</div>
+            <div style="font-size:.8rem;color:var(--text-muted)">Déposé le <span id="rapport-date">—</span> · <span id="rapport-note-display"><span class="badge badge-yellow">En attente</span></span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ETUD: DEMANDES -->
+      <div id="etud-demandes" class="dash-section">
+        <div class="dash-header"><h1>Mes Demandes</h1><p>Suivi de vos demandes d'encadrement</p></div>
+        <div class="table-wrap"><div class="table-toolbar"><h3>Historique</h3></div>
+          <table><thead><tr><th>Encadrant</th><th>Date</th><th>Statut</th><th>Actions</th></tr></thead>
+          <tbody id="mes-demandes-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px">Chargement...</td></tr></tbody></table>
+        </div>
+      </div>
+
+      <!-- ETUD: PARAMÈTRES -->
+      <div id="etud-params" class="dash-section">
+        <div class="dash-header"><h1>Paramètres</h1><p>Vos informations de profil</p></div>
+        <div style="background:#fff;border-radius:14px;padding:28px;border:1.5px solid var(--gray-border);max-width:500px">
+          <h3 style="margin-bottom:20px;color:var(--navy)">Mon Profil</h3>
+          <div class="form-group"><label>Nom complet</label><input type="text" id="etud-param-name" disabled/></div>
+          <div class="form-group"><label>Email</label><input type="email" id="etud-param-email" disabled/></div>
+          <div class="form-group"><label>Niveau</label><input type="text" id="etud-param-niveau" disabled/></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ═══════════ DASHBOARD ENCADRANT ═══════════ -->
+<div id="dashboard-encadrant" class="page">
+  <div class="dashboard">
+    <aside class="sidebar">
+      <div class="sidebar-logo-wrap"><img src="res/primary logo.png" alt="Logo"/><div class="sidebar-logo-text">ISITC<span>Stage</span><span class="sidebar-role-label">Espace Encadrant</span></div></div>
+      <div class="sidebar-divider"></div>
+      <nav class="sidebar-nav" id="sidebar-encadrant">
+        <a class="active" onclick="showSection('enc-accueil','sidebar-encadrant')"><span class="nav-icon">🏠</span><span>Accueil</span></a>
+        <a onclick="showSection('enc-demandes','sidebar-encadrant')"><span class="nav-icon">📬</span><span>Demandes reçues</span></a>
+        <a onclick="showSection('enc-rapports','sidebar-encadrant')"><span class="nav-icon">📄</span><span>Rapports</span></a>
+        <a onclick="showSection('enc-params','sidebar-encadrant')"><span class="nav-icon">⚙️</span><span>Paramètres</span></a>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="sidebar-user"><div class="sidebar-avatar" id="enc-avatar">EN</div><div class="sidebar-user-info"><div class="sidebar-user-name" id="enc-sidebar-name">Encadrant</div><div class="sidebar-user-role">Encadrant</div></div></div>
+        <button class="btn-logout" onclick="handleLogout()">🚪 Déconnexion</button>
+      </div>
+    </aside>
+    <main class="dash-main">
+      <div class="page-topbar"><div class="topbar-title" id="enc-topbar-title">Tableau de bord</div><div class="topbar-date" id="current-date-enc"></div></div>
+
+      <!-- ENC: ACCUEIL -->
+      <div id="enc-accueil" class="dash-section active">
+        <div class="welcome-banner"><div class="welcome-text"><h2>Bonjour, <span id="enc-prenom">Encadrant</span> 👋</h2><p>Bienvenue dans votre espace encadrant</p></div><div class="welcome-emoji">👨‍🏫</div></div>
+        <div class="kpi-grid">
+          <div class="kpi-card"><div class="kpi-icon blue">👩‍🎓</div><div class="kpi-info"><div class="kpi-value" id="enc-kpi-etudiants">0</div><div class="kpi-label">Étudiants encadrés</div></div></div>
+          <div class="kpi-card"><div class="kpi-icon orange">📬</div><div class="kpi-info"><div class="kpi-value" id="enc-kpi-demandes">0</div><div class="kpi-label">Demandes en attente</div></div></div>
+          <div class="kpi-card"><div class="kpi-icon green">📄</div><div class="kpi-info"><div class="kpi-value" id="enc-kpi-rapports">0</div><div class="kpi-label">Rapports à évaluer</div></div></div>
+        </div>
+        <div class="quick-actions">
+          <div class="qa-btn" onclick="showSection('enc-demandes','sidebar-encadrant')"><div class="qa-icon">📬</div><span>Voir les demandes</span></div>
+          <div class="qa-btn" onclick="showSection('enc-rapports','sidebar-encadrant')"><div class="qa-icon">📄</div><span>Évaluer les rapports</span></div>
+          <div class="qa-btn" onclick="showSection('enc-params','sidebar-encadrant')"><div class="qa-icon">⚙️</div><span>Mon profil</span></div>
+        </div>
+      </div>
+
+      <!-- ENC: DEMANDES -->
+      <div id="enc-demandes" class="dash-section">
+        <div class="dash-header"><h1>Demandes reçues</h1><p>Acceptez ou refusez les demandes d'encadrement</p></div>
+        <div class="demand-list" id="enc-demand-list"><div class="empty-state"><div class="empty-icon">📬</div><p>Chargement...</p></div></div>
+      </div>
+
+      <!-- ENC: RAPPORTS -->
+      <div id="enc-rapports" class="dash-section">
+        <div class="dash-header"><h1>Rapports de Stage</h1><p>Consultez et notez les rapports déposés</p></div>
+        <div class="opp-list" id="enc-rapports-list"><div class="empty-state"><div class="empty-icon">📄</div><p>Chargement...</p></div></div>
+      </div>
+
+      <!-- ENC: PARAMÈTRES -->
+      <div id="enc-params" class="dash-section">
+        <div class="dash-header"><h1>Paramètres</h1><p>Gérez votre profil</p></div>
+        <div style="background:#fff;border-radius:14px;padding:28px;border:1.5px solid var(--gray-border);max-width:500px">
+          <h3 style="margin-bottom:20px;color:var(--navy)">Mon Profil</h3>
+          <div class="form-group"><label>Nom</label><input type="text" id="enc-param-name"/></div>
+          <div class="form-group"><label>Email</label><input type="email" id="enc-param-email" disabled/></div>
+          <div class="form-group"><label>Spécialité</label><input type="text" id="enc-param-spec"/></div>
+          <button class="btn btn-primary" onclick="showToast('✅ Profil mis à jour !','success')">Enregistrer</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ═══════════ DASHBOARD ADMIN ═══════════ -->
+<div id="dashboard-admin" class="page">
+  <div class="dashboard">
+    <aside class="sidebar">
+      <div class="sidebar-logo-wrap"><img src="res/primary logo.png" alt="Logo"/><div class="sidebar-logo-text">ISITC<span>Stage</span><span class="sidebar-role-label">Administration</span></div></div>
+      <div class="sidebar-divider"></div>
+      <nav class="sidebar-nav" id="sidebar-admin">
+        <a class="active" onclick="showSection('admin-accueil','sidebar-admin')"><span class="nav-icon">🏠</span><span>Tableau de bord</span></a>
+        <a onclick="showSection('admin-users','sidebar-admin')"><span class="nav-icon">👥</span><span>Encadrants</span></a>
+        <a onclick="showSection('admin-stages','sidebar-admin')"><span class="nav-icon">🏢</span><span>Stages</span></a>
+        <a onclick="showSection('admin-soutenances','sidebar-admin')"><span class="nav-icon">📅</span><span>Soutenances</span></a>
+        <a onclick="showSection('admin-stats','sidebar-admin')"><span class="nav-icon">📊</span><span>Statistiques</span></a>
+        <a onclick="showSection('admin-publications','sidebar-admin')"><span class="nav-icon">📢</span><span>Publications</span></a>
+        <a onclick="showSection('admin-params','sidebar-admin')"><span class="nav-icon">⚙️</span><span>Paramètres</span></a>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="sidebar-user"><div class="sidebar-avatar" id="admin-avatar">JJ</div><div class="sidebar-user-info"><div class="sidebar-user-name" id="admin-sidebar-name">Admin</div><div class="sidebar-user-role">Administrateur</div></div></div>
+        <button class="btn-logout" onclick="handleLogout()">🚪 Déconnexion</button>
+      </div>
+    </aside>
+    <main class="dash-main">
+      <div class="page-topbar"><div class="topbar-title" id="admin-topbar-title">Tableau de bord</div><div class="topbar-date" id="current-date-admin"></div></div>
+
+      <!-- ADMIN: ACCUEIL -->
+      <div id="admin-accueil" class="dash-section active">
+        <div class="welcome-banner"><div class="welcome-text"><h2>Bonjour, <span id="admin-prenom">Admin</span> 👋</h2><p>Tableau de bord d'administration</p></div><div class="welcome-emoji">⚙️</div></div>
+        <div class="kpi-grid kpi-grid-4">
+          <div class="kpi-card"><div class="kpi-icon orange">👨‍🏫</div><div class="kpi-info"><div class="kpi-value" id="kpi-total-encadrants">0</div><div class="kpi-label">Encadrants</div></div></div>
+          <div class="kpi-card"><div class="kpi-icon blue">🎓</div><div class="kpi-info"><div class="kpi-value" id="kpi-total-etudiants">0</div><div class="kpi-label">Étudiants</div></div></div>
+          <div class="kpi-card"><div class="kpi-icon green">📬</div><div class="kpi-info"><div class="kpi-value" id="kpi-total-demandes">0</div><div class="kpi-label">Demandes</div></div></div>
+          <div class="kpi-card"><div class="kpi-icon red">📅</div><div class="kpi-info"><div class="kpi-value">—</div><div class="kpi-label">Soutenances</div></div></div>
+        </div>
+        <div class="quick-actions">
+          <div class="qa-btn" onclick="showSection('admin-users','sidebar-admin')"><div class="qa-icon">👥</div><span>Gérer encadrants</span></div>
+          <div class="qa-btn" onclick="showSection('admin-stats','sidebar-admin')"><div class="qa-icon">📊</div><span>Statistiques</span></div>
+          <div class="qa-btn" onclick="showSection('admin-soutenances','sidebar-admin')"><div class="qa-icon">📅</div><span>Soutenances</span></div>
+        </div>
+        <div class="bar-chart"><h3>📊 Encadrants</h3><div id="bar-chart-rows"><div class="empty-state"><p>Chargement...</p></div></div></div>
+      </div>
+
+      <!-- ADMIN: ENCADRANTS -->
+      <div id="admin-users" class="dash-section">
+        <div class="dash-header"><div style="display:flex;align-items:center;justify-content:space-between"><div><h1>Gestion des Encadrants</h1><p>Ajoutez et gérez les encadrants</p></div><button class="btn btn-orange" onclick="openModal('modal-add-encadrant')">➕ Ajouter</button></div></div>
+        <div class="table-wrap"><div class="table-toolbar"><h3>Encadrants</h3></div>
+          <table><thead><tr><th>Nom</th><th>Email</th><th>Spécialité</th><th>Actions</th></tr></thead>
+          <tbody id="encadrants-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px">Chargement...</td></tr></tbody></table>
+        </div>
+      </div>
+
+      <!-- ADMIN: STAGES -->
+      <div id="admin-stages" class="dash-section">
+        <div class="dash-header"><h1>Stages & Partenaires</h1><p>Gérez les opportunités</p></div>
+        <div class="opp-list" id="opp-list-admin"></div>
+      </div>
+
+      <!-- ADMIN: SOUTENANCES -->
+      <div id="admin-soutenances" class="dash-section">
+        <div class="dash-header"><div style="display:flex;align-items:center;justify-content:space-between"><div><h1>Soutenances</h1><p>Planification</p></div><button class="btn btn-primary" onclick="openModal('modal-soutenance')">📅 Planifier</button></div></div>
+        <div class="calendar-grid">
+          <div class="calendar-header"><span>◀</span><span style="font-family:'Outfit',sans-serif;font-weight:700">Avril 2025</span><span>▶</span></div>
+          <div class="cal-days-header"><div class="cal-day-name">Lun</div><div class="cal-day-name">Mar</div><div class="cal-day-name">Mer</div><div class="cal-day-name">Jeu</div><div class="cal-day-name">Ven</div><div class="cal-day-name">Sam</div><div class="cal-day-name">Dim</div></div>
+          <div class="cal-cells" id="cal-cells"></div>
+        </div>
+        <div style="margin-top:20px" class="table-wrap"><div class="table-toolbar"><h3>Soutenances planifiées</h3></div>
+          <table><thead><tr><th>Étudiant</th><th>Date</th><th>Heure</th><th>Salle</th><th>Jury</th><th>Actions</th></tr></thead>
+          <tbody id="soutenances-tbody"><tr><td>Yassine Gharbi</td><td>15/04/2025</td><td>09h00</td><td>Salle A1</td><td>Dr. Bennani</td><td class="td-actions"><button class="btn btn-sm btn-outline-blue">✏️</button></td></tr></tbody></table>
+        </div>
+      </div>
+
+      <!-- ADMIN: STATS -->
+      <div id="admin-stats" class="dash-section">
+        <div class="dash-header"><h1>Statistiques</h1><p>Données en temps réel (Firebase)</p></div>
+        <div class="kpi-grid" style="margin-bottom:28px">
+          <div class="kpi-card"><div class="kpi-icon orange">👥</div><div class="kpi-info"><div class="kpi-value">10</div><div class="kpi-label">Limite/encadrant</div></div></div>
+          <div class="kpi-card"><div class="kpi-icon blue">📊</div><div class="kpi-info"><div class="kpi-value" id="stat-total-encadrants">0</div><div class="kpi-label">Encadrants</div></div></div>
+          <div class="kpi-card"><div class="kpi-icon green">✅</div><div class="kpi-info"><div class="kpi-value">—</div><div class="kpi-label">Moyenne</div></div></div>
+        </div>
+        <div style="background:#fff;border-radius:14px;border:1.5px solid var(--gray-border);padding:24px">
+          <h3 style="margin-bottom:20px;color:var(--navy)">Taux d'encadrement</h3>
+          <div class="progress-list" id="stats-encadrants-list"><div class="empty-state"><p>Chargement...</p></div></div>
+        </div>
+      </div>
+
+      <!-- ADMIN: PUBLICATIONS -->
+      <div id="admin-publications" class="dash-section">
+        <div class="dash-header"><h1>Publications</h1><p>Actualités et opportunités</p></div>
+        <div style="background:#fff;border-radius:14px;padding:24px;border:1.5px solid var(--gray-border);margin-bottom:24px">
+          <h3 style="margin-bottom:16px;color:var(--navy)">Nouvelle publication</h3>
+          <div class="form-group"><label>Titre</label><input type="text" id="pub-titre" placeholder="Titre"/></div>
+          <div class="form-group"><label>Type</label><select id="pub-type"><option value="new">Nouveauté</option><option value="comp">Compétition</option><option value="form">Formation</option></select></div>
+          <div class="form-group"><label>Description</label><textarea id="pub-desc" placeholder="Description..."></textarea></div>
+          <div class="form-group"><label>Date</label><input type="date" id="pub-date"/></div>
+          <button class="btn btn-primary" onclick="publishItem()">📢 Publier</button>
+        </div>
+        <div id="pub-list" class="pub-list"></div>
+      </div>
+
+      <!-- ADMIN: PARAMS -->
+      <div id="admin-params" class="dash-section">
+        <div class="dash-header"><h1>Paramètres</h1><p>Configuration</p></div>
+        <div style="background:#fff;border-radius:14px;padding:28px;border:1.5px solid var(--gray-border);max-width:500px">
+          <h3 style="margin-bottom:20px;color:var(--navy)">Profil Admin</h3>
+          <div class="form-group"><label>Nom</label><input type="text" value="Jaafer Jarray"/></div>
+          <div class="form-group"><label>Email</label><input type="email" value="jaafer.jarray@isitc.u-sousse.tn" disabled/></div>
+          <div class="form-group"><label>Limite étudiants/encadrant</label><input type="number" value="10" min="1" max="20"/></div>
+          <button class="btn btn-primary" onclick="showToast('✅ Enregistré !','success')">Enregistrer</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL: AJOUTER ENCADRANT ═══════════ -->
+<div id="modal-add-encadrant" class="modal-overlay" onclick="closeModalOnOverlay(event,'modal-add-encadrant')">
+  <div class="modal-card">
+    <div class="modal-close" onclick="closeModal('modal-add-encadrant')">✕</div>
+    <div class="modal-title">➕ Ajouter un Encadrant</div>
+    <div class="auth-note">Cet encadrant pourra se connecter avec ces identifiants.</div>
+    <div class="form-row"><div class="form-group" style="margin-bottom:0"><label>Prénom</label><input type="text" id="add-enc-prenom" placeholder="Prénom"/></div><div class="form-group" style="margin-bottom:0"><label>Nom</label><input type="text" id="add-enc-nom" placeholder="Nom"/></div></div>
+    <div class="form-group" style="margin-top:14px"><label>Email</label><input type="email" id="add-enc-email" placeholder="email@isitc.u-sousse.tn"/></div>
+    <div class="form-group"><label>Spécialité</label><input type="text" id="add-enc-spec" placeholder="ex: Développement Web"/></div>
+    <div class="form-group"><label>Mot de passe</label><input type="password" id="add-enc-password" placeholder="Min. 6 caractères"/></div>
+    <div style="display:flex;gap:12px;margin-top:8px"><button id="add-enc-btn" class="btn btn-primary btn-full" onclick="addEncadrant()">💾 Enregistrer</button><button class="btn btn-outline-blue" onclick="closeModal('modal-add-encadrant')" style="flex:0;white-space:nowrap">Annuler</button></div>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL: SOUTENANCE ═══════════ -->
+<div id="modal-soutenance" class="modal-overlay" onclick="closeModalOnOverlay(event,'modal-soutenance')">
+  <div class="modal-card">
+    <div class="modal-close" onclick="closeModal('modal-soutenance')">✕</div>
+    <div class="modal-title">📅 Planifier une Soutenance</div>
+    <div class="form-group"><label>Étudiant</label><input type="text" id="sout-etudiant" placeholder="Nom"/></div>
+    <div class="form-row"><div class="form-group" style="margin-bottom:0"><label>Date</label><input type="date" id="sout-date"/></div><div class="form-group" style="margin-bottom:0"><label>Heure</label><input type="time" id="sout-time"/></div></div>
+    <div class="form-group" style="margin-top:14px"><label>Salle</label><input type="text" id="sout-salle" placeholder="Salle A1"/></div>
+    <div class="form-group"><label>Jury</label><textarea id="sout-jury" placeholder="Membres du jury..."></textarea></div>
+    <div style="display:flex;gap:12px;margin-top:8px"><button class="btn btn-primary btn-full" onclick="saveSoutenance()">📅 Planifier</button><button class="btn btn-outline-blue" onclick="closeModal('modal-soutenance')" style="flex:0;white-space:nowrap">Annuler</button></div>
+  </div>
+</div>
+
+<!-- FIREBASE SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics-compat.js"></script>
+<script src="old-script.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
