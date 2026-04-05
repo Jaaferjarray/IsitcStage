@@ -475,22 +475,39 @@ async function loadAdminStats() {
    ═══════════════════════════════════════ */
 async function loadEncadrantCards() {
   const grid = document.getElementById('enc-cards-grid');
-  if (!grid) return;
+  if (!grid || !currentUser) return;
   try {
-    const snap = await db.collection('users').where('role', '==', 'encadrant').get();
-    if (snap.empty) { grid.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div><p>Aucun encadrant disponible.</p></div>'; return; }
-    grid.innerHTML = snap.docs.map(doc => {
+    const encSnap = await db.collection('users').where('role', '==', 'encadrant').get();
+    if (encSnap.empty) { grid.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div><p>Aucun encadrant disponible.</p></div>'; return; }
+
+    const reqSnap = await db.collection('demandes').where('etudiantId', '==', currentUser.uid).get();
+    const existingReqs = reqSnap.docs.map(doc => doc.data());
+    const hasAccepted = existingReqs.some(r => r.status === 'acceptee');
+
+    grid.innerHTML = encSnap.docs.map(doc => {
       const d = doc.data();
       const initials = (d.name || 'EN').split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2);
+      
+      const req = existingReqs.find(r => r.encadrantId === doc.id);
+      let btnHTML = `<button class="btn btn-orange btn-full" onclick="sendDemande('${doc.id}','${d.name}')">📩 Envoyer une demande</button>`;
+      
+      if (req) {
+        if (req.status === 'en_attente') btnHTML = `<button class="btn btn-full" disabled style="background:#e9ecef;color:var(--text-muted);border:1px solid var(--gray-border);cursor:not-allowed">⏳ Envoyée (En attente)</button>`;
+        else if (req.status === 'acceptee') btnHTML = `<button class="btn btn-full" disabled style="background:#d1fae5;color:var(--green);border:1px solid #a7f3d0;cursor:not-allowed">✅ Acceptée</button>`;
+        else if (req.status === 'refusee') btnHTML = `<button class="btn btn-full" disabled style="background:#fee2e2;color:var(--red);border:1px solid #fecaca;cursor:not-allowed">❌ Refusée</button>`;
+      } else if (hasAccepted) {
+        btnHTML = `<button class="btn btn-full" disabled style="background:#e9ecef;color:var(--text-muted);border:1px solid var(--gray-border);cursor:not-allowed">🚫 Indisponible</button>`;
+      }
+
       return `<div class="enc-card">
         <div class="avatar-circle">${initials}</div>
         <div class="enc-name">${d.name}</div>
         <div class="enc-spec">${d.specialite || '—'}</div>
         <div class="enc-badge">👩‍🎓 ${d.nbEtudiants || 0} étudiants</div>
-        <button class="btn btn-orange btn-full" onclick="sendDemande('${doc.id}','${d.name}')">📩 Envoyer une demande</button>
+        ${btnHTML}
       </div>`;
     }).join('');
-  } catch (e) { grid.innerHTML = '<div class="empty-state"><p>Erreur de chargement.</p></div>'; }
+  } catch (e) { grid.innerHTML = '<div class="empty-state"><p>Erreur.</p></div>'; }
 }
 
 function filterEncadrants(query) {
@@ -505,26 +522,48 @@ function filterEncadrants(query) {
 /* ═══════════════════════════════════════
    ÉTUDIANT: DEMANDES (Firestore)
    ═══════════════════════════════════════ */
+window.currentDemandeTarget = null;
 async function sendDemande(encadrantId, encadrantName) {
   if (!currentUser) return;
-  console.log('[DEBUG sendDemande] encadrantId:', encadrantId, '| encadrantName:', encadrantName);
-  console.log('[DEBUG sendDemande] currentUser.uid:', currentUser.uid, '| role:', currentUserData.role);
+  window.currentDemandeTarget = { id: encadrantId, name: encadrantName };
+  document.getElementById('modal-demande-target-name').textContent = "Envoyez une demande d'encadrement à " + encadrantName + ".";
+  document.getElementById('modal-demande-msg').value = "Je souhaite effectuer mon stage PFA avec vous. Voici mon CV/GitHub: ";
+  document.getElementById('modal-demande').style.display = 'flex';
+}
+
+async function submitDemande() {
+  if (!currentUser || !window.currentDemandeTarget) return;
+  const btn = document.querySelector('#modal-demande .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Envoi...'; }
+  const encadrantId = window.currentDemandeTarget.id;
+  const encadrantName = window.currentDemandeTarget.name;
+  const msg = document.getElementById('modal-demande-msg').value;
+
+  const fileInput = document.getElementById('modal-demande-file');
+  let cvFile = null;
+  if (fileInput && fileInput.files.length > 0) {
+    cvFile = fileInput.files[0].name;
+  }
+
   try {
-    // Check if already sent (simple query without orderBy to avoid index issues)
     const existing = await db.collection('demandes')
       .where('etudiantId', '==', currentUser.uid)
       .where('encadrantId', '==', encadrantId)
       .where('status', '==', 'en_attente').get();
-    if (!existing.empty) { showToast('⚠️ Demande déjà envoyée à ' + encadrantName, 'warning'); return; }
+    if (!existing.empty) { 
+      showToast('⚠️ Demande déjà envoyée', 'warning'); 
+      if (btn) { btn.disabled = false; btn.textContent = '📩 Envoyer'; } 
+      document.getElementById('modal-demande').style.display = 'none';
+      return; 
+    }
 
-    // Fetch encadrant email from Firestore to store it
     let encadrantEmail = '';
     try {
       const encDoc = await db.collection('users').doc(encadrantId).get();
       if (encDoc.exists) encadrantEmail = encDoc.data().email || '';
-    } catch (err) { console.warn('Could not fetch encadrant email:', err); }
+    } catch(e) {}
 
-    const demandeData = {
+    await db.collection('demandes').add({
       etudiantId: currentUser.uid,
       etudiantName: currentUserData.name,
       etudiantEmail: currentUserData.email,
@@ -532,14 +571,21 @@ async function sendDemande(encadrantId, encadrantName) {
       encadrantName: encadrantName,
       encadrantEmail: encadrantEmail,
       status: 'en_attente',
-      message: 'Demande d\'encadrement de la part de ' + currentUserData.name,
+      message: msg.trim() || "Demande d'encadrement",
+      cvFileName: cvFile,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
-    console.log('[DEBUG sendDemande] Writing to Firestore:', JSON.stringify(demandeData));
-    await db.collection('demandes').add(demandeData);
-    showToast('📩 Demande envoyée à ' + encadrantName + ' !', 'success');
+    });
+    showToast('📩 Demande envoyée !', 'success');
+    document.getElementById('modal-demande').style.display = 'none';
+    if (fileInput) fileInput.value = '';
+    document.getElementById('modal-demande-msg').value = '';
     await loadMesDemandes();
-  } catch (e) { console.error('[DEBUG sendDemande] ERROR:', e); showToast('❌ ' + e.message, 'error'); }
+    await loadEncadrantCards();
+  } catch (e) { 
+    showToast('❌ ' + e.message, 'error'); 
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '📩 Envoyer'; }
+  document.getElementById('modal-demande').style.display = 'none';
 }
 
 async function loadMesDemandes() {
@@ -606,7 +652,7 @@ async function loadMonRapport() {
     if (doc.exists) {
       const d = doc.data();
       uploadZone.style.display = 'none'; deposited.style.display = 'block';
-      setText('rapport-filename', d.fileName || 'rapport.pdf');
+      document.getElementById('rapport-filename').innerHTML = `<a href="#" onclick="showToast('Ouverture du rapport...', 'info')" style="color:var(--navy);text-decoration:underline">${d.fileName || 'rapport.pdf'}</a>`;
       setText('rapport-date', d.depositDate ? d.depositDate.toDate().toLocaleDateString('fr-FR') : '—');
       if (d.note !== null && d.note !== undefined) {
         document.getElementById('rapport-note-display').innerHTML = '<span class="badge badge-blue">' + d.note + '/20</span>';
@@ -619,8 +665,61 @@ async function loadMonRapport() {
       uploadZone.style.display = 'block'; deposited.style.display = 'none';
       if (kpi) kpi.textContent = 'Non';
     }
+    const demSnap = await db.collection('demandes').where('etudiantId', '==', currentUser.uid).where('status', '==', 'acceptee').get();
+    if (!demSnap.empty) {
+      window.currentChatEncadrantId = demSnap.docs[0].data().encadrantId;
+      document.getElementById('etud-chat-container').style.display = 'block';
+      if (window.loadEtudChat) window.loadEtudChat();
+    } else {
+      document.getElementById('etud-chat-container').style.display = 'none';
+      window.currentChatEncadrantId = null;
+    }
   } catch (e) { if (kpi) kpi.textContent = 'Non'; }
 }
+
+let etudChatUnsubscribe = null;
+window.loadEtudChat = function() {
+  if (!window.currentChatEncadrantId || !currentUser) return;
+  const chatC = document.getElementById('etud-chat-messages');
+  if (etudChatUnsubscribe) etudChatUnsubscribe();
+  etudChatUnsubscribe = db.collection('messages')
+    .where('etudiantId', '==', currentUser.uid)
+    .where('encadrantId', '==', window.currentChatEncadrantId)
+    .onSnapshot(snap => {
+      const sortedDocs = snap.docs.sort((a, b) => {
+        const ta = a.data().timestamp ? a.data().timestamp.toMillis() : 0;
+        const tb = b.data().timestamp ? b.data().timestamp.toMillis() : 0;
+        return ta - tb;
+      });
+      chatC.innerHTML = sortedDocs.map(doc => {
+        const d = doc.data();
+        const isMe = d.senderRole === 'etudiant';
+        return `<div style="display:flex;flex-direction:column;align-items:${isMe?'flex-end':'flex-start'}">
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">${d.senderName}</div>
+          <div style="background:${isMe?'var(--blue)':'#fff'};color:${isMe?'#fff':'var(--navy)'};padding:12px 16px;border-radius:12px;border:${isMe?'none':'1px solid var(--gray-border)'};max-width:85%;line-height:1.4">
+            ${d.text}
+          </div>
+        </div>`;
+      }).join('');
+      setTimeout(() => chatC.scrollTop = chatC.scrollHeight, 100);
+    });
+};
+
+window.sendEtudChat = async function() {
+  const inp = document.getElementById('etud-chat-input');
+  if (!inp || !inp.value.trim() || !currentUser || !window.currentChatEncadrantId) return;
+  try {
+    await db.collection('messages').add({
+      etudiantId: currentUser.uid,
+      encadrantId: window.currentChatEncadrantId,
+      senderRole: 'etudiant',
+      senderName: currentUserData.name || 'Étudiant',
+      text: inp.value.trim(),
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    inp.value = '';
+  } catch (e) { showToast("Erreur d'envoi", 'error'); }
+};
 
 /* ═══════════════════════════════════════
    ENCADRANT: DEMANDES REÇUES (Firestore)
@@ -709,17 +808,27 @@ async function loadEncRapports() {
       if (rapDoc.exists) {
         const r = rapDoc.data();
         const date = r.depositDate ? r.depositDate.toDate().toLocaleDateString('fr-FR') : '—';
-        html += `<div class="opp-card">
-          <div class="opp-info">
-            <div class="opp-title">${r.etudiantName} — Rapport</div>
-            <div class="opp-desc">${r.fileName}</div>
-            <div class="opp-meta"><span>📅 ${date}</span></div>
-          </div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0">
-            <div class="note-row">
-              <input type="number" min="0" max="20" placeholder="Note" id="note-${sid}" value="${r.note||''}" style="width:70px;text-align:center"/>
-              <span style="font-size:.8rem">/20</span>
+        html += `<div style="display:flex;flex-direction:column;width:100%;border:1px solid var(--gray-border);border-radius:12px;background:#fff;gap:0;">
+          <div class="opp-card" style="border:none;margin:0;border-radius:12px;">
+            <div class="opp-info">
+              <div class="opp-title">${r.etudiantName} — Rapport</div>
+              <div class="opp-desc"><a href="#" onclick="showToast('Ouverture du fichier...', 'info')" style="color:inherit;text-decoration:underline">${r.fileName}</a></div>
+              <div class="opp-meta"><span>📅 ${date}</span></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">
+              <div class="note-row" style="margin-bottom:0;">
+                <input type="number" min="0" max="20" placeholder="Note" id="note-${sid}" value="${r.note||''}" style="width:70px;text-align:center"/>
+                <span style="font-size:.8rem">/20</span>
+              </div>
               <button class="btn btn-green btn-sm" onclick="assignNoteFirestore('${sid}','note-${sid}')">Attribuer</button>
+              <button class="btn btn-sm" style="background:#eef2ff;color:var(--blue);border:1px solid var(--blue);" onclick="window.toggleEncChat('${sid}','${r.etudiantName}')">💬 Remarques</button>
+            </div>
+          </div>
+          <div id="enc-chat-wrap-${sid}" style="display:none;background:#f8f9fa;border-top:1px solid var(--gray-border);border-radius:0 0 12px 12px;height:350px;flex-direction:column;">
+            <div id="enc-chat-msgs-${sid}" style="flex:1;overflow-y:auto;padding:15px;display:flex;flex-direction:column;gap:10px;"></div>
+            <div style="padding:10px;border-top:1px solid var(--gray-border);display:flex;gap:10px;background:#fff;border-radius:0 0 12px 12px;">
+              <input type="text" id="enc-chat-in-${sid}" placeholder="Votre remarque..." style="flex:1;padding:10px;border-radius:6px;border:1px solid var(--gray-border);outline:none;" onkeypress="if(event.key==='Enter') window.sendEncChat('${sid}')"/>
+              <button class="btn btn-primary btn-sm" onclick="window.sendEncChat('${sid}')">Envoyer</button>
             </div>
           </div>
         </div>`;
@@ -728,6 +837,56 @@ async function loadEncRapports() {
     container.innerHTML = html || '<div class="empty-state"><div class="empty-icon">📄</div><p>Aucun rapport déposé.</p></div>';
   } catch (e) { container.innerHTML = '<div class="empty-state"><p>Aucun rapport.</p></div>'; }
 }
+
+window.encChatUnsubscribes = window.encChatUnsubscribes || {};
+window.toggleEncChat = function(sid, etudName) {
+  const wrap = document.getElementById('enc-chat-wrap-' + sid);
+  if (wrap.style.display === 'flex') {
+    wrap.style.display = 'none';
+    if (window.encChatUnsubscribes[sid]) { window.encChatUnsubscribes[sid](); delete window.encChatUnsubscribes[sid]; }
+  } else {
+    wrap.style.display = 'flex';
+    const msgsContainer = document.getElementById('enc-chat-msgs-' + sid);
+    if (!currentUser) return;
+    window.encChatUnsubscribes[sid] = db.collection('messages')
+      .where('etudiantId', '==', sid)
+      .where('encadrantId', '==', currentUser.uid)
+      .onSnapshot(snap => {
+        const sortedDocs = snap.docs.sort((a, b) => {
+          const ta = a.data().timestamp ? a.data().timestamp.toMillis() : 0;
+          const tb = b.data().timestamp ? b.data().timestamp.toMillis() : 0;
+          return ta - tb;
+        });
+        msgsContainer.innerHTML = sortedDocs.map(doc => {
+          const d = doc.data();
+          const isMe = d.senderRole === 'encadrant';
+          return `<div style="display:flex;flex-direction:column;align-items:${isMe?'flex-end':'flex-start'}">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">${d.senderName}</div>
+            <div style="background:${isMe?'var(--blue)':'#fff'};color:${isMe?'#fff':'var(--navy)'};padding:12px 16px;border-radius:12px;border:${isMe?'none':'1px solid var(--gray-border)'};max-width:85%;line-height:1.4">
+              ${d.text}
+            </div>
+          </div>`;
+        }).join('');
+        setTimeout(() => msgsContainer.scrollTop = msgsContainer.scrollHeight, 100);
+      });
+  }
+};
+
+window.sendEncChat = async function(sid) {
+  const inp = document.getElementById('enc-chat-in-' + sid);
+  if (!inp || !inp.value.trim() || !currentUser) return;
+  try {
+    await db.collection('messages').add({
+      etudiantId: sid,
+      encadrantId: currentUser.uid,
+      senderRole: 'encadrant',
+      senderName: currentUserData.name || 'Encadrant',
+      text: inp.value.trim(),
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    inp.value = '';
+  } catch (e) { showToast("Erreur d'envoi", 'error'); }
+};
 
 async function assignNoteFirestore(studentId, inputId) {
   const inp = document.getElementById(inputId);

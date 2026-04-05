@@ -119,9 +119,9 @@
       <div id="etud-accueil" class="dash-section active">
         <div class="welcome-banner"><div class="welcome-text"><h2>Bonjour, <span id="etud-prenom">Étudiant</span> 👋</h2><p>Bienvenue sur votre espace ISITCStage</p></div><div class="welcome-emoji">🎓</div></div>
         <div class="kpi-grid">
-          <div class="kpi-card"><div class="kpi-icon blue">📬</div><div class="kpi-info"><div class="kpi-value" id="etud-kpi-demandes">0</div><div class="kpi-label">Demandes envoyées</div></div></div>
-          <div class="kpi-card"><div class="kpi-icon orange">📄</div><div class="kpi-info"><div class="kpi-value" id="etud-kpi-rapport">Non</div><div class="kpi-label">Rapport déposé</div></div></div>
-          <div class="kpi-card"><div class="kpi-icon green">⭐</div><div class="kpi-info"><div class="kpi-value" id="etud-kpi-note">—</div><div class="kpi-label">Note obtenue</div></div></div>
+          <div class="kpi-card" style="cursor: pointer;" onclick="showSection('etud-demandes','sidebar-etudiant')"><div class="kpi-icon blue">📬</div><div class="kpi-info"><div class="kpi-value" id="etud-kpi-demandes">0</div><div class="kpi-label">Demandes envoyées</div></div></div>
+          <div class="kpi-card" style="cursor: pointer;" onclick="showSection('etud-rapport','sidebar-etudiant')"><div class="kpi-icon orange">📄</div><div class="kpi-info"><div class="kpi-value" id="etud-kpi-rapport">Non</div><div class="kpi-label">Rapport déposé</div></div></div>
+          <div class="kpi-card" style="cursor: pointer;" onclick="showSection('etud-rapport','sidebar-etudiant')"><div class="kpi-icon green">⭐</div><div class="kpi-info"><div class="kpi-value" id="etud-kpi-note">—</div><div class="kpi-label">Note obtenue</div></div></div>
         </div>
         <div class="quick-actions">
           <div class="qa-btn" onclick="showSection('etud-encadrants','sidebar-etudiant')"><div class="qa-icon">👥</div><span>Trouver un encadrant</span></div>
@@ -152,6 +152,18 @@
             <div style="font-size:2rem">📋</div>
             <div style="flex:1"><div style="font-weight:700;color:var(--navy);margin-bottom:4px" id="rapport-filename">rapport.pdf</div>
             <div style="font-size:.8rem;color:var(--text-muted)">Déposé le <span id="rapport-date">—</span> · <span id="rapport-note-display"><span class="badge badge-yellow">En attente</span></span></div></div>
+          </div>
+        </div>
+        
+        <!-- Chat Container (visible only if accepted) -->
+        <div id="etud-chat-container" style="display:none; margin-top:30px;">
+          <div class="dash-header" style="margin-bottom:12px"><h3 style="margin-bottom:0">Messagerie avec l'encadrant</h3></div>
+          <div style="background:#fff;border-radius:12px;border:1px solid var(--gray-border);overflow:hidden;display:flex;flex-direction:column;height:400px">
+            <div id="etud-chat-messages" style="flex:1;padding:20px;overflow-y:auto;background:#f8f9fa;display:flex;flex-direction:column;gap:12px;"></div>
+            <div style="padding:15px;background:#fff;border-top:1px solid var(--gray-border);display:flex;gap:10px;">
+              <input type="text" id="etud-chat-input" placeholder="Écrivez un message ou une remarque..." style="flex:1;padding:12px;border:1px solid var(--gray-border);border-radius:8px;outline:none;" onkeypress="if(event.key==='Enter') sendEtudChat()"/>
+              <button class="btn btn-primary" onclick="sendEtudChat()">Envoyer</button>
+            </div>
           </div>
         </div>
       </div>
@@ -404,6 +416,27 @@
     <div class="form-group" style="margin-top:14px"><label>Salle</label><input type="text" id="sout-salle" placeholder="Salle A1"/></div>
     <div class="form-group"><label>Jury</label><textarea id="sout-jury" placeholder="Membres du jury..."></textarea></div>
     <div style="display:flex;gap:12px;margin-top:8px"><button class="btn btn-primary btn-full" onclick="saveSoutenance()">📅 Planifier</button><button class="btn btn-outline-blue" onclick="closeModal('modal-soutenance')" style="flex:0;white-space:nowrap">Annuler</button></div>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL: DEMANDE ═══════════ -->
+<div id="modal-demande" class="modal-overlay" onclick="closeModalOnOverlay(event,'modal-demande')">
+  <div class="modal-card">
+    <div class="modal-close" onclick="closeModal('modal-demande')">✕</div>
+    <div class="modal-title">📩 Envoyer une demande</div>
+    <div class="auth-note" id="modal-demande-target-name">Envoyez une demande d'encadrement.</div>
+    <div class="form-group">
+      <label>Message de motivation & liens (GitHub)</label>
+      <textarea id="modal-demande-msg" rows="3" placeholder="Ex: Bonjour, je souhaite effectuer mon PFA avec vous..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>Joindre un CV / Fichier (PDF)</label>
+      <input type="file" id="modal-demande-file" accept=".pdf" style="width: 100%; border: 1px dashed var(--gray-border); padding: 8px; border-radius: 6px; font-size: 0.9rem; background: #fafafa;"/>
+    </div>
+    <div style="display:flex;gap:12px;margin-top:8px">
+      <button class="btn btn-primary btn-full" onclick="submitDemande()">📩 Envoyer</button>
+      <button class="btn btn-outline-blue" onclick="closeModal('modal-demande')" style="flex:0;white-space:nowrap">Annuler</button>
+    </div>
   </div>
 </div>
 
