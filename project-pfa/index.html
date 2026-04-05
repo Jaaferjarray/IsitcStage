@@ -187,7 +187,8 @@
       <div class="sidebar-divider"></div>
       <nav class="sidebar-nav" id="sidebar-encadrant">
         <a class="active" onclick="showSection('enc-accueil','sidebar-encadrant')"><span class="nav-icon">🏠</span><span>Accueil</span></a>
-        <a onclick="showSection('enc-demandes','sidebar-encadrant')"><span class="nav-icon">📬</span><span>Demandes reçues</span></a>
+        <a onclick="showSection('enc-etudiants','sidebar-encadrant')"><span class="nav-icon">🎓</span><span>Mes Étudiants</span></a>
+        <a onclick="showSection('enc-demandes','sidebar-encadrant')"><span class="nav-icon">📬</span><span>Demandes en attente</span></a>
         <a onclick="showSection('enc-rapports','sidebar-encadrant')"><span class="nav-icon">📄</span><span>Rapports</span></a>
         <a onclick="showSection('enc-params','sidebar-encadrant')"><span class="nav-icon">⚙️</span><span>Paramètres</span></a>
       </nav>
@@ -203,9 +204,9 @@
       <div id="enc-accueil" class="dash-section active">
         <div class="welcome-banner"><div class="welcome-text"><h2>Bonjour, <span id="enc-prenom">Encadrant</span> 👋</h2><p>Bienvenue dans votre espace encadrant</p></div><div class="welcome-emoji">👨‍🏫</div></div>
         <div class="kpi-grid">
-          <div class="kpi-card"><div class="kpi-icon blue">👩‍🎓</div><div class="kpi-info"><div class="kpi-value" id="enc-kpi-etudiants">0</div><div class="kpi-label">Étudiants encadrés</div></div></div>
-          <div class="kpi-card"><div class="kpi-icon orange">📬</div><div class="kpi-info"><div class="kpi-value" id="enc-kpi-demandes">0</div><div class="kpi-label">Demandes en attente</div></div></div>
-          <div class="kpi-card"><div class="kpi-icon green">📄</div><div class="kpi-info"><div class="kpi-value" id="enc-kpi-rapports">0</div><div class="kpi-label">Rapports à évaluer</div></div></div>
+          <div class="kpi-card" style="cursor: pointer;" onclick="showSection('enc-etudiants','sidebar-encadrant')"><div class="kpi-icon blue">👩‍🎓</div><div class="kpi-info"><div class="kpi-value" id="enc-kpi-etudiants">0</div><div class="kpi-label">Étudiants encadrés</div></div></div>
+          <div class="kpi-card" style="cursor: pointer;" onclick="showSection('enc-demandes','sidebar-encadrant')"><div class="kpi-icon orange">📬</div><div class="kpi-info"><div class="kpi-value" id="enc-kpi-demandes">0</div><div class="kpi-label">Demandes en attente</div></div></div>
+          <div class="kpi-card" style="cursor: pointer;" onclick="showSection('enc-rapports','sidebar-encadrant')"><div class="kpi-icon green">📄</div><div class="kpi-info"><div class="kpi-value" id="enc-kpi-rapports">0</div><div class="kpi-label">Rapports à évaluer</div></div></div>
         </div>
         <div class="quick-actions">
           <div class="qa-btn" onclick="showSection('enc-demandes','sidebar-encadrant')"><div class="qa-icon">📬</div><span>Voir les demandes</span></div>
@@ -214,9 +215,15 @@
         </div>
       </div>
 
+      <!-- ENC: ÉTUDIANTS -->
+      <div id="enc-etudiants" class="dash-section">
+        <div class="dash-header"><h1>Mes Étudiants</h1><p>Liste de vos étudiants actuellement encadrés</p></div>
+        <div class="demand-list" id="enc-etudiants-list"><div class="empty-state"><div class="empty-icon">👩‍🎓</div><p>Chargement...</p></div></div>
+      </div>
+
       <!-- ENC: DEMANDES -->
       <div id="enc-demandes" class="dash-section">
-        <div class="dash-header"><h1>Demandes reçues</h1><p>Acceptez ou refusez les demandes d'encadrement</p></div>
+        <div class="dash-header"><h1>Demandes en attente</h1><p>Acceptez ou refusez les demandes d'encadrement</p></div>
         <div class="demand-list" id="enc-demand-list"><div class="empty-state"><div class="empty-icon">📬</div><p>Chargement...</p></div></div>
       </div>
 
@@ -234,7 +241,7 @@
           <div class="form-group"><label>Nom</label><input type="text" id="enc-param-name"/></div>
           <div class="form-group"><label>Email</label><input type="email" id="enc-param-email" disabled/></div>
           <div class="form-group"><label>Spécialité</label><input type="text" id="enc-param-spec"/></div>
-          <button class="btn btn-primary" onclick="showToast('✅ Profil mis à jour !','success')">Enregistrer</button>
+          <button class="btn btn-primary" onclick="updateEncadrantProfile()">Enregistrer</button>
         </div>
       </div>
     </main>
@@ -250,6 +257,8 @@
       <nav class="sidebar-nav" id="sidebar-admin">
         <a class="active" onclick="showSection('admin-accueil','sidebar-admin')"><span class="nav-icon">🏠</span><span>Tableau de bord</span></a>
         <a onclick="showSection('admin-users','sidebar-admin')"><span class="nav-icon">👥</span><span>Encadrants</span></a>
+        <a onclick="showSection('admin-etudiants','sidebar-admin')"><span class="nav-icon">🎓</span><span>Étudiants</span></a>
+        <a onclick="showSection('admin-alldemandes','sidebar-admin')"><span class="nav-icon">📬</span><span>Demandes</span></a>
         <a onclick="showSection('admin-stages','sidebar-admin')"><span class="nav-icon">🏢</span><span>Stages</span></a>
         <a onclick="showSection('admin-soutenances','sidebar-admin')"><span class="nav-icon">📅</span><span>Soutenances</span></a>
         <a onclick="showSection('admin-stats','sidebar-admin')"><span class="nav-icon">📊</span><span>Statistiques</span></a>
@@ -268,10 +277,10 @@
       <div id="admin-accueil" class="dash-section active">
         <div class="welcome-banner"><div class="welcome-text"><h2>Bonjour, <span id="admin-prenom">Admin</span> 👋</h2><p>Tableau de bord d'administration</p></div><div class="welcome-emoji">⚙️</div></div>
         <div class="kpi-grid kpi-grid-4">
-          <div class="kpi-card"><div class="kpi-icon orange">👨‍🏫</div><div class="kpi-info"><div class="kpi-value" id="kpi-total-encadrants">0</div><div class="kpi-label">Encadrants</div></div></div>
-          <div class="kpi-card"><div class="kpi-icon blue">🎓</div><div class="kpi-info"><div class="kpi-value" id="kpi-total-etudiants">0</div><div class="kpi-label">Étudiants</div></div></div>
-          <div class="kpi-card"><div class="kpi-icon green">📬</div><div class="kpi-info"><div class="kpi-value" id="kpi-total-demandes">0</div><div class="kpi-label">Demandes</div></div></div>
-          <div class="kpi-card"><div class="kpi-icon red">📅</div><div class="kpi-info"><div class="kpi-value">—</div><div class="kpi-label">Soutenances</div></div></div>
+          <div class="kpi-card" style="cursor: pointer;" onclick="showSection('admin-users','sidebar-admin')"><div class="kpi-icon orange">👨‍🏫</div><div class="kpi-info"><div class="kpi-value" id="kpi-total-encadrants">0</div><div class="kpi-label">Encadrants</div></div></div>
+          <div class="kpi-card" style="cursor: pointer;" onclick="showSection('admin-etudiants','sidebar-admin')"><div class="kpi-icon blue">🎓</div><div class="kpi-info"><div class="kpi-value" id="kpi-total-etudiants">0</div><div class="kpi-label">Étudiants</div></div></div>
+          <div class="kpi-card" style="cursor: pointer;" onclick="showSection('admin-alldemandes','sidebar-admin')"><div class="kpi-icon green">📬</div><div class="kpi-info"><div class="kpi-value" id="kpi-total-demandes">0</div><div class="kpi-label">Demandes</div></div></div>
+          <div class="kpi-card" style="cursor: pointer;" onclick="showSection('admin-soutenances','sidebar-admin')"><div class="kpi-icon red">📅</div><div class="kpi-info"><div class="kpi-value">—</div><div class="kpi-label">Soutenances</div></div></div>
         </div>
         <div class="quick-actions">
           <div class="qa-btn" onclick="showSection('admin-users','sidebar-admin')"><div class="qa-icon">👥</div><span>Gérer encadrants</span></div>
@@ -287,6 +296,24 @@
         <div class="table-wrap"><div class="table-toolbar"><h3>Encadrants</h3></div>
           <table><thead><tr><th>Nom</th><th>Email</th><th>Spécialité</th><th>Actions</th></tr></thead>
           <tbody id="encadrants-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px">Chargement...</td></tr></tbody></table>
+        </div>
+      </div>
+
+      <!-- ADMIN: ÉTUDIANTS -->
+      <div id="admin-etudiants" class="dash-section">
+        <div class="dash-header"><h1>Gestion des Étudiants</h1><p>Consultez et gérez les comptes étudiants</p></div>
+        <div class="table-wrap"><div class="table-toolbar"><h3>Étudiants inscrits</h3></div>
+          <table><thead><tr><th>Nom</th><th>Email</th><th>Niveau</th><th>Actions</th></tr></thead>
+          <tbody id="admin-etudiants-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px">Chargement...</td></tr></tbody></table>
+        </div>
+      </div>
+
+      <!-- ADMIN: TOUTES DEMANDES -->
+      <div id="admin-alldemandes" class="dash-section">
+        <div class="dash-header"><h1>Toutes les Demandes</h1><p>Supervisez toutes les demandes d'encadrement</p></div>
+        <div class="table-wrap"><div class="table-toolbar"><h3>Demandes</h3></div>
+          <table><thead><tr><th>Étudiant</th><th>Encadrant</th><th>Date</th><th>Statut</th></tr></thead>
+          <tbody id="admin-demandes-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px">Chargement...</td></tr></tbody></table>
         </div>
       </div>
 

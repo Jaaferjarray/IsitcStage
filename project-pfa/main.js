@@ -117,9 +117,9 @@ function showSection(sectionId, sidebarId) {
   const titles = {
     'etud-accueil':'Accueil','etud-encadrants':'Encadrants','etud-rapport':'Mon Rapport',
     'etud-demandes':'Mes Demandes','etud-params':'Paramètres',
-    'enc-accueil':'Accueil','enc-etudiants':'Mes Étudiants','enc-demandes':'Demandes reçues',
+    'enc-accueil':'Accueil','enc-etudiants':'Mes Étudiants','enc-demandes':'Demandes en attente',
     'enc-rapports':'Rapports','enc-params':'Paramètres',
-    'admin-accueil':'Tableau de bord','admin-users':'Encadrants','admin-stages':'Stages & Partenaires',
+    'admin-accueil':'Tableau de bord','admin-users':'Encadrants','admin-etudiants':'Étudiants','admin-alldemandes':'Toutes les Demandes','admin-stages':'Stages & Partenaires',
     'admin-soutenances':'Soutenances','admin-stats':'Statistiques','admin-publications':'Publications','admin-params':'Paramètres'
   };
   const prefix = sectionId.split('-')[0];
@@ -228,6 +228,8 @@ async function setupAdminDash() {
   setText('admin-avatar', ((n[0]||'A')[0] + (n[1]||'')[0]).toUpperCase());
   setDate('current-date-admin');
   await loadEncadrantsTable();
+  await loadAdminEtudiants();
+  await loadAdminDemandes();
   await loadAdminStats();
   renderOppList('opp-list-admin');
   renderPublications();
@@ -245,10 +247,34 @@ async function setupEncadrantDash() {
   setText('enc-sidebar-name', currentUserData.name || 'Encadrant');
   setText('enc-avatar', ((n[0]||'E')[0] + (n[1]||'')[0]).toUpperCase());
   setDate('current-date-enc');
+  const paramName = document.getElementById('enc-param-name');
+  if (paramName) paramName.value = currentUserData.name || '';
+  const paramEmail = document.getElementById('enc-param-email');
+  if (paramEmail) paramEmail.value = currentUserData.email || '';
+  const paramSpec = document.getElementById('enc-param-spec');
+  if (paramSpec) paramSpec.value = currentUserData.specialite || '';
   await loadEncadrantStats();
   loadEncDemandes();
   loadEncRapports();
   showSection('enc-accueil', 'sidebar-encadrant');
+}
+
+async function updateEncadrantProfile() {
+  const name = document.getElementById('enc-param-name').value.trim();
+  const spec = document.getElementById('enc-param-spec').value.trim();
+  if (!name) { showToast('⚠️ Le nom est requis.', 'warning'); return; }
+  try {
+    await db.collection('users').doc(currentUser.uid).update({ name: name, specialite: spec });
+    currentUserData.name = name;
+    currentUserData.specialite = spec;
+    const n = name.split(' ');
+    setText('enc-prenom', n[0]);
+    setText('enc-sidebar-name', name);
+    setText('enc-avatar', ((n[0]||'E')[0] + (n[1]||'')[0]).toUpperCase());
+    showToast('✅ Profil mis à jour !', 'success');
+  } catch (e) {
+    showToast('❌ Erreur lors de la mise à jour.', 'error');
+  }
 }
 
 /* ═══════════════════════════════════════
@@ -366,6 +392,47 @@ async function deleteEncadrant(uid, name) {
   if (!confirm('Supprimer "' + name + '" ?')) return;
   try { await db.collection('users').doc(uid).delete(); showToast('🗑️ Supprimé.', 'error'); await loadEncadrantsTable(); await loadAdminStats(); }
   catch (e) { showToast('❌ ' + e.message, 'error'); }
+}
+
+async function loadAdminEtudiants() {
+  const tbody = document.getElementById('admin-etudiants-tbody');
+  if (!tbody) return;
+  try {
+    const snap = await db.collection('users').where('role', '==', 'etudiant').get();
+    if (snap.empty) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px">Aucun étudiant.</td></tr>'; return; }
+    tbody.innerHTML = snap.docs.map(doc => {
+      const d = doc.data();
+      return `<tr><td>${d.name||'—'}</td><td>${d.email||'—'}</td><td>${d.niveau||'—'}</td>
+        <td class="td-actions"><button class="btn btn-sm btn-red" onclick="deleteEtudiant('${doc.id}','${d.name}')">🗑️</button></td></tr>`;
+    }).join('');
+  } catch (e) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--red)">Erreur.</td></tr>'; }
+}
+
+async function deleteEtudiant(uid, name) {
+  if (!confirm(`Supprimer l'étudiant "${name}" ?`)) return;
+  try { await db.collection('users').doc(uid).delete(); showToast('🗑️ Supprimé.', 'error'); await loadAdminEtudiants(); await loadAdminStats(); }
+  catch (e) { showToast('❌ ' + e.message, 'error'); }
+}
+
+async function loadAdminDemandes() {
+  const tbody = document.getElementById('admin-demandes-tbody');
+  if (!tbody) return;
+  try {
+    const snap = await db.collection('demandes').get();
+    if (snap.empty) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px">Aucune demande.</td></tr>'; return; }
+    const docs = snap.docs.sort((a, b) => {
+      const ta = a.data().createdAt ? a.data().createdAt.toMillis() : 0;
+      const tb = b.data().createdAt ? b.data().createdAt.toMillis() : 0;
+      return tb - ta;
+    });
+    tbody.innerHTML = docs.map(doc => {
+      const d = doc.data();
+      const date = d.createdAt ? d.createdAt.toDate().toLocaleDateString('fr-FR') : '—';
+      const badge = d.status === 'acceptee' ? 'badge-green' : d.status === 'refusee' ? 'badge-red' : 'badge-yellow';
+      const label = d.status === 'acceptee' ? 'Acceptée' : d.status === 'refusee' ? 'Refusée' : 'En attente';
+      return `<tr><td>${d.etudiantName||'—'}</td><td>${d.encadrantName||'—'}</td><td>${date}</td><td><span class="badge ${badge}">${label}</span></td></tr>`;
+    }).join('');
+  } catch (e) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--red)">Erreur.</td></tr>'; }
 }
 
 /* ═══════════════════════════════════════
@@ -559,42 +626,55 @@ async function loadMonRapport() {
    ENCADRANT: DEMANDES REÇUES (Firestore)
    ═══════════════════════════════════════ */
 async function loadEncDemandes() {
-  const container = document.getElementById('enc-demand-list');
-  if (!container || !currentUser) return;
-  console.log('[DEBUG loadEncDemandes] currentUser.uid:', currentUser.uid, '| email:', currentUser.email);
+  const cntAttente = document.getElementById('enc-demand-list');
+  const cntEtud = document.getElementById('enc-etudiants-list');
+  if (!currentUser) return;
   try {
-    // No orderBy to avoid composite index requirement — sort client-side
     const snap = await db.collection('demandes').where('encadrantId', '==', currentUser.uid).get();
-    console.log('[DEBUG loadEncDemandes] Found', snap.size, 'demandes for encadrant', currentUser.uid);
-    if (snap.empty) { container.innerHTML = '<div class="empty-state"><div class="empty-icon">📬</div><p>Aucune demande reçue.</p></div>'; return; }
-    // Sort client-side by createdAt descending
     const docs = snap.docs.sort((a, b) => {
       const ta = a.data().createdAt ? a.data().createdAt.toMillis() : 0;
       const tb = b.data().createdAt ? b.data().createdAt.toMillis() : 0;
       return tb - ta;
     });
-    container.innerHTML = docs.map(doc => {
-      const d = doc.data();
-      console.log('[DEBUG loadEncDemandes] demande:', doc.id, '| from:', d.etudiantName, '| encadrantId:', d.encadrantId, '| status:', d.status);
-      const date = d.createdAt ? d.createdAt.toDate().toLocaleDateString('fr-FR') : '—';
-      const badge = d.status === 'acceptee' ? 'badge-green' : d.status === 'refusee' ? 'badge-red' : 'badge-yellow';
-      const label = d.status === 'acceptee' ? 'Acceptée' : d.status === 'refusee' ? 'Refusée' : 'En attente';
-      const actions = d.status === 'en_attente' ? `
-        <div class="demand-actions">
-          <button class="btn btn-green btn-sm" onclick="handleDemandeAction('${doc.id}','acceptee')">✅ Accepter</button>
-          <button class="btn btn-red btn-sm" onclick="handleDemandeAction('${doc.id}','refusee')">❌ Refuser</button>
-        </div>` : `<span style="font-weight:600;color:${d.status==='acceptee'?'var(--green)':'var(--red)'}">${label}</span>`;
-      return `<div class="demand-card">
-        <div class="demand-header"><span class="demand-student">${d.etudiantName}</span><span class="badge ${badge}">${label}</span></div>
-        <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:6px">${d.etudiantEmail} · ${date}</div>
-        <div class="demand-msg">"${d.message}"</div>
-        ${actions}
-      </div>`;
-    }).join('');
+
+    if (cntAttente) {
+      const attenteDocs = docs.filter(doc => doc.data().status === 'en_attente');
+      if (attenteDocs.length === 0) {
+        cntAttente.innerHTML = '<div class="empty-state"><div class="empty-icon">📬</div><p>Aucune demande en attente.</p></div>';
+      } else {
+        cntAttente.innerHTML = attenteDocs.map(generateDemandeHTML).join('');
+      }
+    }
+
+    if (cntEtud) {
+      const etudDocs = docs.filter(doc => doc.data().status === 'acceptee');
+      if (etudDocs.length === 0) {
+        cntEtud.innerHTML = '<div class="empty-state"><div class="empty-icon">👩‍🎓</div><p>Aucun étudiant encadré actuellement.</p></div>';
+      } else {
+        cntEtud.innerHTML = etudDocs.map(generateDemandeHTML).join('');
+      }
+    }
   } catch (e) {
-    console.error('[DEBUG loadEncDemandes] ERROR:', e);
-    container.innerHTML = '<div class="empty-state"><p>Erreur de chargement des demandes. Vérifiez la console.</p></div>';
+    if (cntAttente) cntAttente.innerHTML = '<div class="empty-state"><p>Erreur.</p></div>';
   }
+}
+
+function generateDemandeHTML(doc) {
+  const d = doc.data();
+  const date = d.createdAt ? d.createdAt.toDate().toLocaleDateString('fr-FR') : '—';
+  const badge = d.status === 'acceptee' ? 'badge-green' : d.status === 'refusee' ? 'badge-red' : 'badge-yellow';
+  const label = d.status === 'acceptee' ? 'Acceptée' : d.status === 'refusee' ? 'Refusée' : 'En attente';
+  const actions = d.status === 'en_attente' ? `
+    <div class="demand-actions">
+      <button class="btn btn-green btn-sm" onclick="handleDemandeAction('${doc.id}','acceptee')">✅ Accepter</button>
+      <button class="btn btn-red btn-sm" onclick="handleDemandeAction('${doc.id}','refusee')">❌ Refuser</button>
+    </div>` : `<span style="font-weight:600;color:${d.status==='acceptee'?'var(--green)':'var(--red)'}">${label}</span>`;
+  return `<div class="demand-card">
+    <div class="demand-header"><span class="demand-student">${d.etudiantName}</span><span class="badge ${badge}">${label}</span></div>
+    <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:6px">${d.etudiantEmail} · ${date}</div>
+    <div class="demand-msg">"${d.message}"</div>
+    ${actions}
+  </div>`;
 }
 
 async function handleDemandeAction(demandeId, newStatus) {
