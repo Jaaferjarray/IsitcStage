@@ -332,6 +332,14 @@ async function setupEtudiantDash() {
   setText('etud-sidebar-name', currentUserData.name || 'Étudiant');
   setText('etud-avatar', ((n[0]||'E')[0] + (n[1]||'')[0]).toUpperCase());
   setDate('current-date-etud');
+  
+  const paramName = document.getElementById('etud-param-name');
+  if (paramName) paramName.value = currentUserData.name || '';
+  const paramEmail = document.getElementById('etud-param-email');
+  if (paramEmail) paramEmail.value = currentUserData.email || '';
+  const paramNiveau = document.getElementById('etud-param-niveau');
+  if (paramNiveau) paramNiveau.value = currentUserData.niveau || '';
+
   await loadEncadrantCards();
   await loadMesDemandes();
   await loadMonRapport();
@@ -390,8 +398,23 @@ async function loadEncadrantsTable() {
 
 async function deleteEncadrant(uid, name) {
   if (!confirm('Supprimer "' + name + '" ?')) return;
-  try { await db.collection('users').doc(uid).delete(); showToast('🗑️ Supprimé.', 'error'); await loadEncadrantsTable(); await loadAdminStats(); }
-  catch (e) { showToast('❌ ' + e.message, 'error'); }
+  try { 
+    await db.collection('users').doc(uid).delete();
+    
+    const demSnap = await db.collection('demandes').where('encadrantId', '==', uid).get();
+    const deletes = [];
+    demSnap.forEach(doc => deletes.push(doc.ref.delete()));
+    
+    const msgSnap = await db.collection('messages').where('encadrantId', '==', uid).get();
+    msgSnap.forEach(doc => deletes.push(doc.ref.delete()));
+    
+    await Promise.all(deletes);
+
+    showToast('🗑️ Encadrant supprimé.', 'success'); 
+    await loadEncadrantsTable(); 
+    await loadAdminDemandes();
+    await loadAdminStats(); 
+  } catch (e) { showToast('❌ ' + e.message, 'error'); }
 }
 
 async function loadAdminEtudiants() {
@@ -410,8 +433,37 @@ async function loadAdminEtudiants() {
 
 async function deleteEtudiant(uid, name) {
   if (!confirm(`Supprimer l'étudiant "${name}" ?`)) return;
-  try { await db.collection('users').doc(uid).delete(); showToast('🗑️ Supprimé.', 'error'); await loadAdminEtudiants(); await loadAdminStats(); }
-  catch (e) { showToast('❌ ' + e.message, 'error'); }
+  try { 
+    await db.collection('users').doc(uid).delete();
+    
+    const demSnap = await db.collection('demandes').where('etudiantId', '==', uid).get();
+    const encadrantsToUpdate = new Set();
+    const deletes = [];
+    demSnap.forEach(doc => {
+      if (doc.data().status === 'acceptee') encadrantsToUpdate.add(doc.data().encadrantId);
+      deletes.push(doc.ref.delete());
+    });
+    
+    deletes.push(db.collection('rapports').doc(uid).delete());
+    
+    const msgSnap = await db.collection('messages').where('etudiantId', '==', uid).get();
+    msgSnap.forEach(doc => deletes.push(doc.ref.delete()));
+    
+    await Promise.all(deletes);
+
+    for (let encId of encadrantsToUpdate) {
+      if (!encId) continue;
+      const acceptSnap = await db.collection('demandes').where('encadrantId', '==', encId).where('status', '==', 'acceptee').get();
+      const uniqueS = new Set();
+      acceptSnap.docs.forEach(doc => uniqueS.add(doc.data().etudiantId));
+      await db.collection('users').doc(encId).update({ nbEtudiants: uniqueS.size });
+    }
+
+    showToast('🗑️ Étudiant supprimé.', 'success'); 
+    await loadAdminEtudiants(); 
+    await loadAdminDemandes();
+    await loadAdminStats(); 
+  } catch (e) { showToast('❌ ' + e.message, 'error'); }
 }
 
 async function loadAdminDemandes() {
@@ -448,6 +500,20 @@ async function loadAdminStats() {
     setText('kpi-total-demandes', demSnap.size.toString());
     setText('stat-total-encadrants', encSnap.size.toString());
 
+    // fetch limit
+    let limit = 10;
+    try {
+      const setDoc = await db.collection('settings').doc('global').get();
+      if (setDoc.exists && setDoc.data().encadrantLimit) {
+        limit = setDoc.data().encadrantLimit;
+      }
+    } catch (e) {}
+
+    const limitInput = document.getElementById('admin-limit-input');
+    if (limitInput) limitInput.value = limit;
+    const limitDisplay = document.getElementById('kpi-limit-display');
+    if (limitDisplay) limitDisplay.textContent = limit;
+
     const statsC = document.getElementById('stats-encadrants-list');
     const barC = document.getElementById('bar-chart-rows');
     if (encSnap.empty) {
@@ -455,7 +521,6 @@ async function loadAdminStats() {
       if (barC) barC.innerHTML = '<div class="empty-state"><p>Aucune donnée.</p></div>';
       return;
     }
-    const limit = 10;
     if (statsC) statsC.innerHTML = encSnap.docs.map(doc => {
       const d = doc.data(); const nb = d.nbEtudiants || 0; const pct = Math.round((nb / limit) * 100);
       return `<div class="progress-item"><div class="progress-header"><span>${d.name}</span><span style="color:var(--blue);font-weight:700">${nb}/${limit}</span></div><div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div></div>`;
@@ -468,6 +533,18 @@ async function loadAdminStats() {
       }).join('');
     }
   } catch (e) { console.error('Stats:', e); }
+}
+
+async function updateAdminParams() {
+  const limitInput = document.getElementById('admin-limit-input');
+  if (!limitInput) return;
+  const limitValue = parseInt(limitInput.value);
+  if (isNaN(limitValue) || limitValue < 1) { showToast('⚠️ Limite invalide.', 'warning'); return; }
+  try {
+    await db.collection('settings').doc('global').set({ encadrantLimit: limitValue }, { merge: true });
+    showToast('✅ Paramètres enregistrés !', 'success');
+    await loadAdminStats();
+  } catch (e) { showToast('❌ ' + e.message, 'error'); }
 }
 
 /* ═══════════════════════════════════════
@@ -778,7 +855,55 @@ function generateDemandeHTML(doc) {
 
 async function handleDemandeAction(demandeId, newStatus) {
   try {
+    if (newStatus === 'acceptee') {
+      let limit = 10;
+      try {
+        const setDoc = await db.collection('settings').doc('global').get();
+        if (setDoc.exists && setDoc.data().encadrantLimit) {
+          limit = setDoc.data().encadrantLimit;
+        }
+      } catch (e) {}
+
+      const acceptSnap = await db.collection('demandes')
+        .where('encadrantId', '==', currentUser.uid)
+        .where('status', '==', 'acceptee').get();
+      const uniqueStudents = new Set();
+      acceptSnap.docs.forEach(doc => uniqueStudents.add(doc.data().etudiantId));
+
+      const reqDoc = await db.collection('demandes').doc(demandeId).get();
+      if (reqDoc.exists) {
+        const sid = reqDoc.data().etudiantId;
+        if (!uniqueStudents.has(sid) && uniqueStudents.size >= limit) {
+          showToast("❌ Impossible : Limite d'étudiants atteinte (" + limit + ").", 'error');
+          return;
+        }
+      }
+    }
+
     await db.collection('demandes').doc(demandeId).update({ status: newStatus });
+    
+    if (newStatus === 'acceptee') {
+      try {
+        const reqDoc = await db.collection('demandes').doc(demandeId).get();
+        if (reqDoc.exists) {
+          const sid = reqDoc.data().etudiantId;
+          const otherDems = await db.collection('demandes')
+            .where('etudiantId', '==', sid)
+            .where('status', '==', 'en_attente').get();
+          
+          const deletes = [];
+          otherDems.forEach(d => {
+            if (d.id !== demandeId) {
+              deletes.push(d.ref.delete());
+            }
+          });
+          if (deletes.length > 0) {
+            await Promise.all(deletes);
+          }
+        }
+      } catch(e) { console.error("Error auto-deleting demands: ", e); }
+    }
+
     showToast(newStatus === 'acceptee' ? '✅ Demande acceptée !' : '❌ Demande refusée.', newStatus === 'acceptee' ? 'success' : 'error');
     // Refresh demand list + KPI stats
     await loadEncDemandes();
