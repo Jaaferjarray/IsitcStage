@@ -25,9 +25,6 @@ try { firebase.analytics(); } catch (e) {}
 let currentUser = null;
 let currentUserData = null;
 
-const ADMIN_EMAIL = 'jaafer.jarray@isitc.u-sousse.tn';
-const ADMIN_PASSWORD = 'jaafer1234';
-const ADMIN_NAME = 'Jaafer Jarray';
 
 let publications = [
   { titre: "Stage PFE chez Tunisie Telecom", type: "new", desc: "Offre de stage PFE en développement d'applications mobiles.", date: "01/04/2025" },
@@ -48,31 +45,9 @@ const opportunites = [
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('🚀 ISITCStage init...');
   setAllDates();
-  await seedAdmin();
   setupAuthListener();
 });
 
-async function seedAdmin() {
-  try {
-    const snap = await db.collection('users').where('role', '==', 'admin').limit(1).get();
-    if (!snap.empty) return;
-    let uid;
-    try {
-      const cred = await auth.createUserWithEmailAndPassword(ADMIN_EMAIL, ADMIN_PASSWORD);
-      uid = cred.user.uid; await auth.signOut();
-    } catch (e) {
-      if (e.code === 'auth/email-already-in-use') {
-        const cred = await auth.signInWithEmailAndPassword(ADMIN_EMAIL, ADMIN_PASSWORD);
-        uid = cred.user.uid; await auth.signOut();
-      } else { console.error('Seed error:', e); return; }
-    }
-    await db.collection('users').doc(uid).set({
-      name: ADMIN_NAME, email: ADMIN_EMAIL, role: 'admin',
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    console.log('✅ Admin seeded');
-  } catch (e) { console.error('Seed error:', e); }
-}
 
 function setupAuthListener() {
   auth.onAuthStateChanged(async (user) => {
