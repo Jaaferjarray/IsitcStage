@@ -113,10 +113,48 @@ async function handleLogin(e) {
   if (!email || !password) { showToast('⚠️ Remplissez tous les champs.', 'warning'); return; }
   btn.classList.add('btn-loading'); btn.innerHTML = '<span class="spinner"></span> Connexion...';
   try {
+    // 1. PRIORITÉ : Vérifier si l'admin a défini un mot de passe manuel dans Firestore
+    const snap = await db.collection('users').where('email', '==', email).get();
+    let tempPassOverride = null;
+    if (!snap.empty) {
+      const d = snap.docs[0].data();
+      if (d.tempPassword) {
+        tempPassOverride = d.tempPassword;
+        if (tempPassOverride === password) {
+          currentUserData = d;
+          currentUser = { uid: snap.docs[0].id, email: d.email };
+          finishLogin();
+          return;
+        }
+      }
+    }
+
+    // 2. SINON : Essayer la connexion classique Firebase Auth
     const cred = await auth.signInWithEmailAndPassword(email, password);
     const doc = await db.collection('users').doc(cred.user.uid).get();
-    if (!doc.exists) { showToast('❌ Profil introuvable.', 'error'); await auth.signOut(); resetLoginBtn(); return; }
+    
+    // Vérification supplémentaire : Si un tempPassword existe et qu'on a utilisé l'ancien Auth pass
+    if (doc.exists && doc.data().tempPassword && doc.data().tempPassword !== password) {
+      showToast('❌ Ce mot de passe est obsolète. Utilisez le nouveau défini par l\'admin.', 'error');
+      await auth.signOut();
+      resetLoginBtn();
+      return;
+    }
+
+    if (!doc.exists) { showToast('❌ Profil introuvable ou supprimé.', 'error'); await auth.signOut(); resetLoginBtn(); return; }
+    
     currentUser = cred.user; currentUserData = doc.data();
+    finishLogin();
+  } catch (e) {
+    if (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential')
+      showToast('❌ Email ou mot de passe incorrect.', 'error');
+    else if (e.code === 'auth/too-many-requests') showToast('⚠️ Trop de tentatives.', 'warning');
+    else showToast('❌ ' + e.message, 'error');
+    resetLoginBtn();
+  }
+}
+
+function finishLogin() {
     const prenom = currentUserData.name ? currentUserData.name.split(' ')[0] : 'Utilisateur';
     showToast('✅ Bienvenue ' + prenom + ' !', 'success');
     setTimeout(() => {
@@ -125,13 +163,6 @@ async function handleLogin(e) {
       else if (currentUserData.role === 'etudiant') { setupEtudiantDash(); showPage('dashboard-etudiant'); }
       resetLoginBtn();
     }, 500);
-  } catch (e) {
-    if (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential')
-      showToast('❌ Email ou mot de passe incorrect.', 'error');
-    else if (e.code === 'auth/too-many-requests') showToast('⚠️ Trop de tentatives.', 'warning');
-    else showToast('❌ ' + e.message, 'error');
-    resetLoginBtn();
-  }
 }
 function resetLoginBtn() {
   const btn = document.getElementById('login-btn');
@@ -366,7 +397,10 @@ async function loadEncadrantsTable() {
     tbody.innerHTML = snap.docs.map(doc => {
       const d = doc.data();
       return `<tr><td>${d.name||'—'}</td><td>${d.email||'—'}</td><td>${d.specialite||'—'}</td>
-        <td class="td-actions"><button class="btn btn-sm btn-red" onclick="deleteEncadrant('${doc.id}','${d.name}')">🗑️</button></td></tr>`;
+        <td class="td-actions">
+          <button class="btn btn-sm btn-primary" onclick="openModifyUserModal('${doc.id}','encadrant','${d.email}')">✏️</button>
+          <button class="btn btn-sm btn-red" onclick="deleteEncadrant('${doc.id}','${d.name}')">🗑️</button>
+        </td></tr>`;
     }).join('');
   } catch (e) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--red)">Erreur.</td></tr>'; }
 }
@@ -401,7 +435,10 @@ async function loadAdminEtudiants() {
     tbody.innerHTML = snap.docs.map(doc => {
       const d = doc.data();
       return `<tr><td>${d.name||'—'}</td><td>${d.email||'—'}</td><td>${d.niveau||'—'}</td>
-        <td class="td-actions"><button class="btn btn-sm btn-red" onclick="deleteEtudiant('${doc.id}','${d.name}')">🗑️</button></td></tr>`;
+        <td class="td-actions">
+          <button class="btn btn-sm btn-primary" onclick="openModifyUserModal('${doc.id}','etudiant','${d.email}')">✏️</button>
+          <button class="btn btn-sm btn-red" onclick="deleteEtudiant('${doc.id}','${d.name}')">🗑️</button>
+        </td></tr>`;
     }).join('');
   } catch (e) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--red)">Erreur.</td></tr>'; }
 }
@@ -1067,6 +1104,73 @@ function saveSoutenance() {
     tbody.appendChild(tr);
   }
   closeModal('modal-soutenance'); showToast('✅ Soutenance planifiée !', 'success');
+}
+
+
+/* ═══════════════════════════════════════
+   ADMIN: USER MODIFICATION
+   ═══════════════════════════════════════ */
+function openModifyUserModal(uid, role, email) {
+  document.getElementById('modify-user-uid').value = uid;
+  document.getElementById('modify-user-role').value = role;
+  document.getElementById('modify-user-email').value = email;
+  document.getElementById('admin-confirm-password').value = '';
+  document.getElementById('modify-user-note').textContent = "Modification du compte " + (role === 'encadrant' ? 'Encadrant' : 'Étudiant');
+  openModal('modal-modify-user');
+}
+
+async function sendResetEmail() {
+  const email = document.getElementById('modify-user-email').value.trim();
+  if (!email) { showToast('⚠️ Aucun email spécifié.', 'warning'); return; }
+  try {
+    await auth.sendPasswordResetEmail(email);
+    showToast('📧 Email de réinitialisation envoyé à ' + email, 'success');
+  } catch (e) {
+    showToast('❌ Erreur : ' + e.message, 'error');
+  }
+}
+
+async function handleModifyUser() {
+  const uid = document.getElementById('modify-user-uid').value;
+  const role = document.getElementById('modify-user-role').value;
+  const newEmail = document.getElementById('modify-user-email').value.trim();
+  const newPassword = document.getElementById('modify-user-password').value.trim();
+  const adminPassword = document.getElementById('admin-confirm-password').value;
+  const btn = document.getElementById('modify-user-btn');
+
+  if (!newEmail) { showToast('⚠️ Email requis.', 'warning'); return; }
+  if (!adminPassword) { showToast('⚠️ Confirmation : Mot de passe admin requis.', 'warning'); return; }
+
+  btn.classList.add('btn-loading');
+  btn.disabled = true;
+
+  try {
+    // 1. Confirmation de l'identité Admin
+    const credential = firebase.auth.EmailAuthProvider.credential(currentUser.email, adminPassword);
+    await currentUser.reauthenticateWithCredential(credential);
+
+    // 2. Mise à jour Firestore
+    const updates = { email: newEmail };
+    if (newPassword) {
+      updates.tempPassword = newPassword; // Stockage pour le fallback au login
+    }
+    
+    await db.collection('users').doc(uid).update(updates);
+
+    showToast('✅ Modifications enregistrées. L\'utilisateur pourra se connecter avec son nouveau mot de passe.', 'success');
+    closeModal('modal-modify-user');
+    
+    if (role === 'encadrant') await loadEncadrantsTable();
+    else await loadAdminEtudiants();
+    
+    await loadAdminStats();
+  } catch (e) {
+    if (e.code === 'auth/wrong-password') showToast('❌ Mot de passe admin incorrect.', 'error');
+    else showToast('❌ ' + e.message, 'error');
+  } finally {
+    btn.classList.remove('btn-loading');
+    btn.disabled = false;
+  }
 }
 
 /* ═══════════════════════════════════════
