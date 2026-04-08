@@ -403,24 +403,13 @@ async function loadEncadrantsTable() {
 }
 
 async function deleteEncadrant(uid, name) {
-  if (!confirm('Supprimer "' + name + '" ?')) return;
-  try { 
-    await db.collection('users').doc(uid).delete();
-    
-    const demSnap = await db.collection('demandes').where('encadrantId', '==', uid).get();
-    const deletes = [];
-    demSnap.forEach(doc => deletes.push(doc.ref.delete()));
-    
-    const msgSnap = await db.collection('messages').where('encadrantId', '==', uid).get();
-    msgSnap.forEach(doc => deletes.push(doc.ref.delete()));
-    
-    await Promise.all(deletes);
-
-    showToast('🗑️ Encadrant supprimé.', 'success'); 
-    await loadEncadrantsTable(); 
-    await loadAdminDemandes();
-    await loadAdminStats(); 
-  } catch (e) { showToast('❌ ' + e.message, 'error'); }
+  const modal = document.getElementById('modal-confirm-delete');
+  if (!modal) return;
+  document.getElementById('delete-target-uid').value = uid;
+  document.getElementById('delete-target-type').value = 'encadrant';
+  document.getElementById('delete-user-display-name').textContent = name;
+  document.getElementById('admin-delete-password').value = '';
+  openModal('modal-confirm-delete');
 }
 
 async function loadAdminEtudiants() {
@@ -441,41 +430,73 @@ async function loadAdminEtudiants() {
 }
 
 async function deleteEtudiant(uid, name) {
-  if (!confirm(`Supprimer l'étudiant "${name}" ?`)) return;
-  try { 
-    await db.collection('users').doc(uid).delete();
-    
-    const demSnap = await db.collection('demandes').where('etudiantId', '==', uid).get();
-    const encadrantsToUpdate = new Set();
-    const deletes = [];
-    demSnap.forEach(doc => {
-      if (doc.data().status === 'acceptee') encadrantsToUpdate.add(doc.data().encadrantId);
-      deletes.push(doc.ref.delete());
-    });
-    
-    deletes.push(db.collection('rapports').doc(uid).delete());
-    
-    const msgSnap = await db.collection('messages').where('etudiantId', '==', uid).get();
-    msgSnap.forEach(doc => deletes.push(doc.ref.delete()));
+  const modal = document.getElementById('modal-confirm-delete');
+  if (!modal) return;
+  document.getElementById('delete-target-uid').value = uid;
+  document.getElementById('delete-target-type').value = 'etudiant';
+  document.getElementById('delete-user-display-name').textContent = name;
+  document.getElementById('admin-delete-password').value = '';
+  openModal('modal-confirm-delete');
+}
 
-    const soutSnap = await db.collection('soutenances').where('etudiantId', '==', uid).get();
-    soutSnap.forEach(doc => deletes.push(doc.ref.delete()));
-    
-    await Promise.all(deletes);
+async function executeDeletion() {
+  const uid = document.getElementById('delete-target-uid').value;
+  const type = document.getElementById('delete-target-type').value;
+  const adminPassword = document.getElementById('admin-delete-password').value;
+  const btn = document.getElementById('btn-confirm-delete');
 
-    for (let encId of encadrantsToUpdate) {
-      if (!encId) continue;
-      const acceptSnap = await db.collection('demandes').where('encadrantId', '==', encId).where('status', '==', 'acceptee').get();
-      const uniqueS = new Set();
-      acceptSnap.docs.forEach(doc => uniqueS.add(doc.data().etudiantId));
-      await db.collection('users').doc(encId).update({ nbEtudiants: uniqueS.size });
+  if (!adminPassword) { showToast('⚠️ Entrez votre mot de passe.', 'warning'); return; }
+  
+  btn.classList.add('btn-loading'); btn.disabled = true;
+
+  try {
+    const credential = firebase.auth.EmailAuthProvider.credential(currentUser.email, adminPassword);
+    await currentUser.reauthenticateWithCredential(credential);
+
+    if (type === 'encadrant') {
+      await db.collection('users').doc(uid).delete();
+      const demSnap = await db.collection('demandes').where('encadrantId', '==', uid).get();
+      const deletes = [];
+      demSnap.forEach(doc => deletes.push(doc.ref.delete()));
+      const msgSnap = await db.collection('messages').where('encadrantId', '==', uid).get();
+      msgSnap.forEach(doc => deletes.push(doc.ref.delete()));
+      await Promise.all(deletes);
+      showToast('🗑️ Encadrant supprimé.', 'success'); 
+      await loadEncadrantsTable();
+    } else {
+      await db.collection('users').doc(uid).delete();
+      const demSnap = await db.collection('demandes').where('etudiantId', '==', uid).get();
+      const encadrantsToUpdate = new Set();
+      const deletes = [];
+      demSnap.forEach(doc => {
+        if (doc.data().status === 'acceptee') encadrantsToUpdate.add(doc.data().encadrantId);
+        deletes.push(doc.ref.delete());
+      });
+      deletes.push(db.collection('rapports').doc(uid).delete());
+      const msgSnap = await db.collection('messages').where('etudiantId', '==', uid).get();
+      msgSnap.forEach(doc => deletes.push(doc.ref.delete()));
+      const soutSnap = await db.collection('soutenances').where('etudiantId', '==', uid).get();
+      soutSnap.forEach(doc => deletes.push(doc.ref.delete()));
+      await Promise.all(deletes);
+      for (let encId of encadrantsToUpdate) {
+        if (!encId) continue;
+        const acceptSnap = await db.collection('demandes').where('encadrantId', '==', encId).where('status', '==', 'acceptee').get();
+        const uniqueS = new Set();
+        acceptSnap.docs.forEach(doc => uniqueS.add(doc.data().etudiantId));
+        await db.collection('users').doc(encId).update({ nbEtudiants: uniqueS.size });
+      }
+      showToast('🗑️ Étudiant supprimé.', 'success'); 
+      await loadAdminEtudiants(); 
     }
 
-    showToast('🗑️ Étudiant supprimé.', 'success'); 
-    await loadAdminEtudiants(); 
-    await loadAdminDemandes();
-    await loadAdminStats(); 
-  } catch (e) { showToast('❌ ' + e.message, 'error'); }
+    await loadAdminDemandes(); await loadAdminStats(); 
+    closeModal('modal-confirm-delete');
+  } catch (e) {
+    if (e.code === 'auth/wrong-password') showToast('❌ Mot de passe admin incorrect.', 'error');
+    else showToast('❌ ' + e.message, 'error');
+  } finally {
+    btn.classList.remove('btn-loading'); btn.disabled = false;
+  }
 }
 
 async function loadAdminDemandes() {
