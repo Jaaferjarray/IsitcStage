@@ -236,7 +236,7 @@ async function setupAdminDash() {
   await loadAdminStats();
   renderOppList('opp-list-admin');
   renderPublications();
-  renderCalendar();
+  await loadAdminSoutenances();
   showSection('admin-accueil', 'sidebar-admin');
 }
 
@@ -457,6 +457,9 @@ async function deleteEtudiant(uid, name) {
     
     const msgSnap = await db.collection('messages').where('etudiantId', '==', uid).get();
     msgSnap.forEach(doc => deletes.push(doc.ref.delete()));
+
+    const soutSnap = await db.collection('soutenances').where('etudiantId', '==', uid).get();
+    soutSnap.forEach(doc => deletes.push(doc.ref.delete()));
     
     await Promise.all(deletes);
 
@@ -1072,12 +1075,134 @@ function renderPublications() {
 /* ═══════════════════════════════════════
    CALENDAR & SOUTENANCES
    ═══════════════════════════════════════ */
-function renderCalendar() {
+/* ═══════════════════════════════════════
+   ADMIN: SOUTENANCES (CALENDRIER & PLANIFICATION)
+   ═══════════════════════════════════════ */
+
+async function loadAvailableStudentsForSoutenance() {
+  const select = document.getElementById('sout-etudiant');
+  if (!select) return;
+  select.innerHTML = '<option value="">Chargement...</option>';
+  try {
+    // 1. Récupérer tous les étudiants
+    const studentsSnap = await db.collection('users').where('role', '==', 'etudiant').get();
+    // 2. Récupérer les ID de ceux qui ont déjà une soutenance planifiée
+    const plannedSnap = await db.collection('soutenances').get();
+    const plannedIds = plannedSnap.docs.map(doc => doc.data().etudiantId);
+
+    let html = '<option value="">-- Sélectionner l\'étudiant --</option>';
+    let count = 0;
+    studentsSnap.forEach(doc => {
+      if (!plannedIds.includes(doc.id)) {
+        html += `<option value="${doc.id}">${doc.data().name}</option>`;
+        count++;
+      }
+    });
+    select.innerHTML = count > 0 ? html : '<option value="">Aucun étudiant disponible</option>';
+  } catch (e) { select.innerHTML = '<option value="">Erreur de chargement</option>'; }
+}
+
+async function saveSoutenance() {
+  const id = document.getElementById('sout-id').value;
+  const select = document.getElementById('sout-etudiant');
+  const etudiantId = select.value;
+  const etudiantName = select.options[select.selectedIndex]?.text;
+  const dateValue = document.getElementById('sout-date').value;
+  const timeValue = document.getElementById('sout-time').value;
+  const salle = document.getElementById('sout-salle').value;
+  const jury = document.getElementById('sout-jury').value;
+
+  if (!etudiantId || !dateValue || !salle) { showToast('⚠️ Remplissez les champs obligatoires.', 'warning'); return; }
+
+  try {
+    const data = {
+      etudiantId, etudiantName, date: dateValue, time: timeValue, salle, jury,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    if (id) {
+      await db.collection('soutenances').doc(id).update(data);
+      showToast('✅ Soutenance mise à jour !', 'success');
+    } else {
+      data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection('soutenances').add(data);
+      showToast('✅ Soutenance planifiée !', 'success');
+    }
+    
+    closeModal('modal-soutenance');
+    document.getElementById('sout-id').value = ''; 
+    await loadAdminSoutenances();
+  } catch (e) { showToast('❌ Erreur : ' + e.message, 'error'); }
+}
+
+async function openEditSoutenanceModal(id) {
+  try {
+    const doc = await db.collection('soutenances').doc(id).get();
+    if (!doc.exists) return;
+    const s = doc.data();
+    
+    // On remplit le select avec l'étudiant actuel même s'il ne devrait plus être dans la liste des "disponibles"
+    const select = document.getElementById('sout-etudiant');
+    select.innerHTML = `<option value="${s.etudiantId}" selected>${s.etudiantName}</option>`;
+    
+    document.getElementById('sout-id').value = id;
+    document.getElementById('sout-date').value = s.date;
+    document.getElementById('sout-time').value = s.time;
+    document.getElementById('sout-salle').value = s.salle;
+    document.getElementById('sout-jury').value = s.jury;
+    
+    openModal('modal-soutenance');
+  } catch (e) { console.error(e); }
+}
+
+async function loadAdminSoutenances() {
+  const tbody = document.getElementById('soutenances-tbody');
+  if (!tbody) return;
+  try {
+    const snap = await db.collection('soutenances').orderBy('date', 'asc').get();
+    const events = {};
+    
+    if (snap.empty) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted)">Aucune planification.</td></tr>';
+      renderCalendar({});
+      return;
+    }
+
+    tbody.innerHTML = snap.docs.map(doc => {
+      const s = doc.data();
+      const day = parseInt(s.date.split('-')[2]);
+      events[day] = 'Soutenance';
+      
+      return `<tr>
+        <td><strong>${s.etudiantName}</strong></td>
+        <td>${new Date(s.date).toLocaleDateString('fr-FR')}</td>
+        <td>${s.time || '—'}</td>
+        <td>${s.salle}</td>
+        <td>${s.jury || '—'}</td>
+        <td class="td-actions">
+          <button class="btn btn-sm btn-outline-blue" onclick="openEditSoutenanceModal('${doc.id}')">✏️</button>
+          <button class="btn btn-sm btn-outline-red" onclick="deleteSoutenance('${doc.id}')">🗑️</button>
+        </td>
+      </tr>`;
+    }).join('');
+    
+    renderCalendar(events);
+  } catch (e) { console.error(e); }
+}
+
+async function deleteSoutenance(id) {
+  if (!confirm('Supprimer cette planification ?')) return;
+  await db.collection('soutenances').doc(id).delete();
+  showToast('🗑️ Planification supprimée.');
+  await loadAdminSoutenances();
+}
+
+function renderCalendar(events = {}) {
   const cells = document.getElementById('cal-cells');
   if (!cells) return;
-  const events = { 15: 'Soutenance', 16: 'Soutenance', 22: 'Soutenance', 28: 'Soutenance' };
   const today = new Date().getDate();
-  let html = '<div class="cal-cell" style="background:var(--gray-bg)"></div>';
+  let html = '';
+  // On remplit 30 jours pour l'exemple
   for (let d = 1; d <= 30; d++) {
     const ev = events[d];
     html += `<div class="cal-cell${d===today?' today':''}${ev?' has-event':''}">
@@ -1085,22 +1210,6 @@ function renderCalendar() {
       ${ev?`<div class="cal-event">${ev}</div>`:''}</div>`;
   }
   cells.innerHTML = html;
-}
-
-function saveSoutenance() {
-  const e = document.getElementById('sout-etudiant').value;
-  const d = document.getElementById('sout-date').value;
-  const t = document.getElementById('sout-time').value;
-  const s = document.getElementById('sout-salle').value;
-  const j = document.getElementById('sout-jury').value;
-  if (!e || !d || !s) { showToast('⚠️ Remplissez les champs.', 'warning'); return; }
-  const tbody = document.getElementById('soutenances-tbody');
-  if (tbody) {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${e}</td><td>${new Date(d).toLocaleDateString('fr-FR')}</td><td>${t||'—'}</td><td>${s}</td><td>${j||'—'}</td><td class="td-actions"><button class="btn btn-sm btn-outline-blue">✏️</button></td>`;
-    tbody.appendChild(tr);
-  }
-  closeModal('modal-soutenance'); showToast('✅ Soutenance planifiée !', 'success');
 }
 
 

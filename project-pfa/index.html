@@ -707,7 +707,7 @@
               <div>
                 <h1>Soutenances</h1>
                 <p>Planification</p>
-              </div><button class="btn btn-primary" onclick="openModal('modal-soutenance')">📅 Planifier</button>
+              </div><button class="btn btn-primary" onclick="loadAvailableStudentsForSoutenance(); openModal('modal-soutenance')">📅 Planifier</button>
             </div>
           </div>
           <div class="calendar-grid">
@@ -865,7 +865,13 @@
     <div class="modal-card">
       <div class="modal-close" onclick="closeModal('modal-soutenance')">✕</div>
       <div class="modal-title">📅 Planifier une Soutenance</div>
-      <div class="form-group"><label>Étudiant</label><input type="text" id="sout-etudiant" placeholder="Nom" /></div>
+      <input type="hidden" id="sout-id" />
+      <div class="form-group">
+        <label>Étudiant</label>
+        <select id="sout-etudiant">
+          <option value="">Chargement des étudiants...</option>
+        </select>
+      </div>
       <div class="form-row">
         <div class="form-group" style="margin-bottom:0"><label>Date</label><input type="date" id="sout-date" /></div>
         <div class="form-group" style="margin-bottom:0"><label>Heure</label><input type="time" id="sout-time" /></div>
