@@ -113,36 +113,33 @@ async function handleLogin(e) {
   if (!email || !password) { showToast('⚠️ Remplissez tous les champs.', 'warning'); return; }
   btn.classList.add('btn-loading'); btn.innerHTML = '<span class="spinner"></span> Connexion...';
   try {
-    // 1. PRIORITÉ : Vérifier si l'admin a défini un mot de passe manuel dans Firestore
+    // 1. RECHERCHE DE L'UTILISATEUR DANS FIRESTORE
     const snap = await db.collection('users').where('email', '==', email).get();
-    let tempPassOverride = null;
+    
     if (!snap.empty) {
       const d = snap.docs[0].data();
+      
+      // 2. VERROUILLAGE SI UN MOT DE PASSE ADMIN EXISTE
       if (d.tempPassword) {
-        tempPassOverride = d.tempPassword;
-        if (tempPassOverride === password) {
+        if (d.tempPassword === password) {
+          // Nouveau mot de passe correct -> Connexion Manuelle
           currentUserData = d;
           currentUser = { uid: snap.docs[0].id, email: d.email };
           finishLogin();
+          return;
+        } else {
+          // Ancien mot de passe ou mauvais mot de passe -> REJET IMMÉDIAT
+          showToast('❌ Mot de passe obsolète ou incorrect.', 'error');
+          resetLoginBtn();
           return;
         }
       }
     }
 
-    // 2. SINON : Essayer la connexion classique Firebase Auth
+    // 3. SI AUCUN VERROUILLAGE : Connexion normale via Firebase Auth
     const cred = await auth.signInWithEmailAndPassword(email, password);
     const doc = await db.collection('users').doc(cred.user.uid).get();
-    
-    // Vérification supplémentaire : Si un tempPassword existe et qu'on a utilisé l'ancien Auth pass
-    if (doc.exists && doc.data().tempPassword && doc.data().tempPassword !== password) {
-      showToast('❌ Ce mot de passe est obsolète. Utilisez le nouveau défini par l\'admin.', 'error');
-      await auth.signOut();
-      resetLoginBtn();
-      return;
-    }
-
-    if (!doc.exists) { showToast('❌ Profil introuvable ou supprimé.', 'error'); await auth.signOut(); resetLoginBtn(); return; }
-    
+    if (!doc.exists) { showToast('❌ Profil introuvable.', 'error'); await auth.signOut(); resetLoginBtn(); return; }
     currentUser = cred.user; currentUserData = doc.data();
     finishLogin();
   } catch (e) {
