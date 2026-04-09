@@ -358,7 +358,34 @@ async function setupEtudiantDash() {
   await loadEncadrantCards();
   await loadMesDemandes();
   await loadMonRapport();
+  await loadMaSoutenance();
   showSection('etud-accueil', 'sidebar-etudiant');
+}
+
+async function loadMaSoutenance() {
+  const infoCard = document.getElementById('etud-soutenance-info');
+  const emptyState = document.getElementById('etud-soutenance-empty');
+  if (!infoCard || !emptyState || !currentUser) return;
+
+  try {
+    const snap = await db.collection('soutenances').where('etudiantId', '==', currentUser.uid).limit(1).get();
+    if (!snap.empty) {
+      const s = snap.docs[0].data();
+      infoCard.style.display = 'block';
+      emptyState.style.display = 'none';
+      
+      const formattedDate = s.date ? new Date(s.date).toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : '—';
+      setText('etud-sout-date', formattedDate);
+      setText('etud-sout-time', s.time || '—');
+      setText('etud-sout-salle', s.salle || '—');
+      setText('etud-sout-jury', s.jury || '—');
+    } else {
+      infoCard.style.display = 'none';
+      emptyState.style.display = 'block';
+    }
+  } catch (e) {
+    console.error('Erreur loadMaSoutenance:', e);
+  }
 }
 
 /* ═══════════════════════════════════════
