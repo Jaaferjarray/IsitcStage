@@ -75,6 +75,14 @@ function showPage(id) {
   if (t) { t.classList.add('active'); window.scrollTo(0, 0); }
 }
 
+function toggleSidebar() {
+  const asides = document.querySelectorAll('aside');
+  asides.forEach(a => {
+    // On ne toggle que celle qui appartient au dashboard actif
+    if (a.closest('.page.active')) a.classList.toggle('open');
+  });
+}
+
 function showSection(sectionId, sidebarId) {
   const page = document.querySelector('.page.active');
   if (!page) return;
@@ -88,6 +96,10 @@ function showSection(sectionId, sidebarId) {
       const oc = a.getAttribute('onclick');
       if (oc && oc.includes("'" + sectionId + "'")) a.classList.add('active');
     });
+    
+    // FERMER LE SIDEBAR SUR MOBILE APRES CLIC
+    const aside = nav.closest('aside');
+    if (aside) aside.classList.remove('open');
   }
   const titles = {
     'etud-accueil':'Accueil','etud-encadrants':'Encadrants','etud-rapport':'Mon Rapport',
