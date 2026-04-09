@@ -177,7 +177,8 @@
           <a onclick="showSection('etud-soutenance','sidebar-etudiant')"><span class="nav-icon">📅</span><span>Ma
               Soutenance</span><span class="nav-badge" id="badge-etud-soutenance">+1</span></a>
           <a onclick="showSection('etud-demandes','sidebar-etudiant')"><span class="nav-icon">📬</span><span>Mes
-              Demandes</span><span class="nav-badge" id="badge-etud-demandes">+1</span></a>
+              Demandes</span></a>
+          <a onclick="showSection('etud-publications','sidebar-etudiant')"><span class="nav-icon">📢</span><span>Actualités</span></a>
           <a onclick="showSection('etud-params','sidebar-etudiant')"><span
               class="nav-icon">⚙️</span><span>Paramètres</span></a>
         </nav>
@@ -380,6 +381,17 @@
                 <div style="font-weight:600; font-size:1.05rem;" id="etud-sout-jury">—</div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- SECTION PUBLICATIONS ETUDIANT -->
+        <div id="etud-publications" class="dash-section">
+          <div class="dash-header">
+            <h1>Actualités & Opportunités</h1>
+            <p>Consultez les dernières annonces de l'administration</p>
+          </div>
+          <div id="etud-pub-list" class="pub-list">
+            <div class="empty-state"><p>Chargement des actualités...</p></div>
           </div>
         </div>
 

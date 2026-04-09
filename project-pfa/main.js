@@ -103,6 +103,7 @@ function showSection(sectionId, sidebarId) {
   }
   const titles = {
     'etud-accueil':'Accueil','etud-encadrants':'Encadrants','etud-rapport':'Mon Rapport',
+    'etud-soutenance':'Ma Soutenance','etud-publications':'Actualités',
     'etud-demandes':'Mes Demandes','etud-params':'Paramètres',
     'enc-accueil':'Accueil','enc-etudiants':'Mes Étudiants','enc-demandes':'Demandes en attente',
     'enc-rapports':'Rapports','enc-params':'Paramètres',
@@ -247,7 +248,7 @@ async function setupAdminDash() {
   await loadAdminDemandes();
   await loadAdminStats();
   renderOppList('opp-list-admin');
-  renderPublications();
+  await loadAllPublications();
   await loadAdminSoutenances();
   showSection('admin-accueil', 'sidebar-admin');
 }
@@ -358,8 +359,26 @@ async function setupEtudiantDash() {
   await loadEncadrantCards();
   await loadMesDemandes();
   await loadMonRapport();
+  await loadEtudiantStats();
+  await loadAllPublications();
   await loadMaSoutenance();
   showSection('etud-accueil', 'sidebar-etudiant');
+}
+
+async function loadEtudiantStats() {
+  if (!currentUser) return;
+  try {
+    const demSnap = await db.collection('demandes').where('etudiantId', '==', currentUser.uid).get();
+    setText('etud-kpi-demandes', demSnap.size);
+    
+    // Note et rapport
+    const rapSnap = await db.collection('rapports').doc(currentUser.uid).get();
+    if (rapSnap.exists) {
+      setText('etud-kpi-rapport', 'Oui');
+      const d = rapSnap.data();
+      setText('etud-kpi-note', d.note || '—');
+    }
+  } catch (e) { console.error('loadEtudiantStats:', e); }
 }
 
 async function loadMaSoutenance() {
@@ -1111,25 +1130,99 @@ function renderOppList(containerId) {
 /* ═══════════════════════════════════════
    PUBLICATIONS
    ═══════════════════════════════════════ */
-function publishItem() {
+async function publishItem() {
+  const id = document.getElementById('pub-id')?.value; // On ajoute un champ caché pour l'ID si besoin
   const t = document.getElementById('pub-titre').value.trim();
   const ty = document.getElementById('pub-type').value;
   const d = document.getElementById('pub-desc').value.trim();
   const dt = document.getElementById('pub-date').value;
-  if (!t || !d) { showToast('⚠️ Remplissez titre et description.', 'warning'); return; }
-  publications.unshift({ titre: t, type: ty, desc: d, date: dt ? new Date(dt).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR') });
-  renderPublications();
-  document.getElementById('pub-titre').value = ''; document.getElementById('pub-desc').value = '';
-  showToast('📢 Publié !', 'success');
+  
+  if (!t || !d) { showToast('⚠️ Remplissez le titre et la description.', 'warning'); return; }
+  
+  try {
+    const data = {
+      titre: t, type: ty, desc: d, date: dt || new Date().toISOString().split('T')[0],
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    if (id) {
+      await db.collection('publications').doc(id).update(data);
+      showToast('✅ Publication mise à jour !', 'success');
+      document.getElementById('pub-id').value = '';
+    } else {
+      data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection('publications').add(data);
+      showToast('📢 Publication réussie !', 'success');
+    }
+
+    document.getElementById('pub-titre').value = '';
+    document.getElementById('pub-desc').value = '';
+    await loadAllPublications();
+  } catch (e) { showToast('❌ Erreur : ' + e.message, 'error'); }
 }
 
-function renderPublications() {
-  const l = document.getElementById('pub-list');
-  if (!l) return;
-  const labels = { new: 'Nouveauté', comp: 'Compétition', form: 'Formation' };
-  l.innerHTML = publications.map(p => `<div class="pub-item"><span class="pub-type-badge ${p.type}">${labels[p.type]||p.type}</span>
-    <div class="pub-info"><div class="pub-title">${p.titre}</div><div class="pub-desc">${p.desc}</div></div>
-    <div class="pub-date">${p.date}</div></div>`).join('');
+async function loadAllPublications() {
+  try {
+    const snap = await db.collection('publications').orderBy('createdAt', 'desc').get();
+    const l_admin = document.getElementById('pub-list');
+    const l_etud = document.getElementById('etud-pub-list');
+    const labels = { new: 'Nouveauté', comp: 'Compétition', form: 'Formation' };
+    
+    const html = snap.docs.map(doc => {
+      const p = doc.data();
+      const isAdmin = currentUserData?.role === 'admin';
+      return `<div class="pub-item">
+        <span class="pub-type-badge ${p.type}">${labels[p.type] || p.type}</span>
+        <div class="pub-info">
+          <div class="pub-title">${p.titre}</div>
+          <div class="pub-desc">${p.desc}</div>
+        </div>
+        <div class="pub-date">${p.date || ''}</div>
+        ${isAdmin ? `
+          <div class="td-actions" style="margin-left:12px">
+            <button class="btn btn-sm btn-outline-blue" onclick="editPublication('${doc.id}')" title="Modifier">✏️</button>
+            <button class="btn btn-sm btn-red" onclick="deletePublication('${doc.id}')" title="Supprimer">🗑️</button>
+          </div>
+        ` : ''}
+      </div>`;
+    }).join('');
+
+    if (l_admin) l_admin.innerHTML = html || '<div class="empty-state">Aucune publication.</div>';
+    if (l_etud) l_etud.innerHTML = html || '<div class="empty-state">Aucune actualité.</div>';
+  } catch (e) { console.error(e); }
+}
+
+async function deletePublication(id) {
+  if (!confirm('Supprimer cette publication ?')) return;
+  try {
+    await db.collection('publications').doc(id).delete();
+    showToast('🗑️ Publication supprimée.');
+    await loadAllPublications();
+  } catch (e) { showToast('❌ ' + e.message, 'error'); }
+}
+
+async function editPublication(id) {
+  try {
+    const doc = await db.collection('publications').doc(id).get();
+    if (!doc.exists) return;
+    const p = doc.data();
+    
+    if (!document.getElementById('pub-id')) {
+      const hidden = document.createElement('input');
+      hidden.type = 'hidden';
+      hidden.id = 'pub-id';
+      document.getElementById('admin-publications').appendChild(hidden);
+    }
+    
+    document.getElementById('pub-id').value = id;
+    document.getElementById('pub-titre').value = p.titre;
+    document.getElementById('pub-type').value = p.type;
+    document.getElementById('pub-desc').value = p.desc;
+    document.getElementById('pub-date').value = p.date || '';
+    
+    document.getElementById('admin-publications').scrollIntoView({ behavior: 'smooth' });
+    showToast('📝 Édition en cours...');
+  } catch (e) { console.error(e); }
 }
 
 /* ═══════════════════════════════════════
