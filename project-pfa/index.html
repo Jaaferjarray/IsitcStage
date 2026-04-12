@@ -578,8 +578,7 @@
               class="nav-icon">🎓</span><span>Étudiants</span></a>
           <a onclick="showSection('admin-alldemandes','sidebar-admin')"><span
               class="nav-icon">📬</span><span>Demandes</span></a>
-          <a onclick="showSection('admin-stages','sidebar-admin')"><span
-              class="nav-icon">🏢</span><span>Stages</span></a>
+
           <a onclick="showSection('admin-soutenances','sidebar-admin')"><span
               class="nav-icon">📅</span><span>Soutenances</span></a>
           <a onclick="showSection('admin-stats','sidebar-admin')"><span
@@ -757,14 +756,7 @@
           </div>
         </div>
 
-        <!-- ADMIN: STAGES -->
-        <div id="admin-stages" class="dash-section">
-          <div class="dash-header">
-            <h1>Stages & Partenaires</h1>
-            <p>Gérez les opportunités</p>
-          </div>
-          <div class="opp-list" id="opp-list-admin"></div>
-        </div>
+
 
         <!-- ADMIN: SOUTENANCES -->
         <div id="admin-soutenances" class="dash-section">
@@ -960,14 +952,9 @@
       <div class="modal-title">📩 Envoyer une demande</div>
       <div class="auth-note" id="modal-demande-target-name">Envoyez une demande d'encadrement.</div>
       <div class="form-group">
-        <label>Message de motivation & liens (GitHub)</label>
-        <textarea id="modal-demande-msg" rows="3"
-          placeholder="Ex: Bonjour, je souhaite effectuer mon PFE avec vous..."></textarea>
-      </div>
-      <div class="form-group">
-        <label>Joindre un CV / Fichier (PDF)</label>
-        <input type="file" id="modal-demande-file" accept=".pdf"
-          style="width: 100%; border: 1px dashed var(--gray-border); padding: 8px; border-radius: 6px; font-size: 0.9rem; background: #fafafa;" />
+        <label>Message de motivation</label>
+        <textarea id="modal-demande-msg" rows="5"
+          placeholder="Ex: Bonjour, je souhaite effectuer mon stage de PFE avec vous..."></textarea>
       </div>
       <div style="display:flex;gap:12px;margin-top:8px">
         <button class="btn btn-primary btn-full" onclick="submitDemande()">📩 Envoyer</button>

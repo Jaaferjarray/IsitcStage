@@ -107,7 +107,7 @@ function showSection(sectionId, sidebarId) {
     'etud-demandes':'Mes Demandes','etud-params':'Paramètres',
     'enc-accueil':'Accueil','enc-etudiants':'Mes Étudiants','enc-demandes':'Demandes en attente',
     'enc-rapports':'Rapports','enc-params':'Paramètres',
-    'admin-accueil':'Tableau de bord','admin-users':'Encadrants','admin-etudiants':'Étudiants','admin-alldemandes':'Toutes les Demandes','admin-stages':'Stages & Partenaires',
+    'admin-accueil':'Tableau de bord','admin-users':'Encadrants','admin-etudiants':'Étudiants','admin-alldemandes':'Toutes les Demandes',
     'admin-soutenances':'Soutenances','admin-stats':'Statistiques','admin-publications':'Publications','admin-params':'Paramètres'
   };
   const prefix = sectionId.split('-')[0];
@@ -247,7 +247,7 @@ async function setupAdminDash() {
   await loadAdminEtudiants();
   await loadAdminDemandes();
   await loadAdminStats();
-  renderOppList('opp-list-admin');
+
   await loadAllPublications();
   await loadAdminSoutenances();
   showSection('admin-accueil', 'sidebar-admin');
@@ -695,8 +695,8 @@ async function sendDemande(encadrantId, encadrantName) {
   if (!currentUser) return;
   window.currentDemandeTarget = { id: encadrantId, name: encadrantName };
   document.getElementById('modal-demande-target-name').textContent = "Envoyez une demande d'encadrement à " + encadrantName + ".";
-  document.getElementById('modal-demande-msg').value = "Je souhaite effectuer mon stage PFA avec vous. Voici mon CV/GitHub: ";
-  document.getElementById('modal-demande').style.display = 'flex';
+  document.getElementById('modal-demande-msg').value = "Je souhaite effectuer mon stage de PFE avec vous.";
+  openModal('modal-demande');
 }
 
 async function submitDemande() {
@@ -707,12 +707,6 @@ async function submitDemande() {
   const encadrantName = window.currentDemandeTarget.name;
   const msg = document.getElementById('modal-demande-msg').value;
 
-  const fileInput = document.getElementById('modal-demande-file');
-  let cvFile = null;
-  if (fileInput && fileInput.files.length > 0) {
-    cvFile = fileInput.files[0].name;
-  }
-
   try {
     const existing = await db.collection('demandes')
       .where('etudiantId', '==', currentUser.uid)
@@ -721,7 +715,7 @@ async function submitDemande() {
     if (!existing.empty) { 
       showToast('⚠️ Demande déjà envoyée', 'warning'); 
       if (btn) { btn.disabled = false; btn.textContent = '📩 Envoyer'; } 
-      document.getElementById('modal-demande').style.display = 'none';
+      closeModal('modal-demande');
       return; 
     }
 
@@ -740,12 +734,10 @@ async function submitDemande() {
       encadrantEmail: encadrantEmail,
       status: 'en_attente',
       message: msg.trim() || "Demande d'encadrement",
-      cvFileName: cvFile,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     showToast('📩 Demande envoyée !', 'success');
-    document.getElementById('modal-demande').style.display = 'none';
-    if (fileInput) fileInput.value = '';
+    closeModal('modal-demande');
     document.getElementById('modal-demande-msg').value = '';
     await loadMesDemandes();
     await loadEncadrantCards();
@@ -753,7 +745,7 @@ async function submitDemande() {
     showToast('❌ ' + e.message, 'error'); 
   }
   if (btn) { btn.disabled = false; btn.textContent = '📩 Envoyer'; }
-  document.getElementById('modal-demande').style.display = 'none';
+  closeModal('modal-demande');
 }
 
 async function loadMesDemandes() {
@@ -1118,14 +1110,7 @@ async function assignNoteFirestore(studentId, inputId) {
 /* ═══════════════════════════════════════
    OPPORTUNITIES
    ═══════════════════════════════════════ */
-function renderOppList(containerId) {
-  const c = document.getElementById(containerId);
-  if (!c) return;
-  c.innerHTML = opportunites.map(o => `
-    <div class="opp-card"><div class="opp-info"><div class="opp-title">${o.titre}</div><div class="opp-desc">${o.desc}</div>
-    <div class="opp-meta"><span>🏢 ${o.partenaire}</span><span>📅 ${o.date}</span></div></div>
-    <div style="flex-shrink:0"><button class="btn btn-primary btn-sm" onclick="showToast('📋 ${o.titre}')">Détails</button></div></div>`).join('');
-}
+
 
 /* ═══════════════════════════════════════
    PUBLICATIONS
