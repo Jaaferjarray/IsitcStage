@@ -102,11 +102,11 @@ function showSection(sectionId, sidebarId) {
     if (aside) aside.classList.remove('open');
   }
   const titles = {
-    'etud-accueil':'Accueil','etud-encadrants':'Encadrants','etud-rapport':'Mon Rapport',
+    'etud-accueil':'Accueil','etud-encadrants':'Encadrants','etud-rapport':'Conversations',
     'etud-soutenance':'Ma Soutenance','etud-publications':'Actualités',
     'etud-demandes':'Mes Demandes','etud-params':'Paramètres',
     'enc-accueil':'Accueil','enc-etudiants':'Mes Étudiants','enc-demandes':'Demandes en attente',
-    'enc-rapports':'Rapports','enc-params':'Paramètres',
+    'enc-rapports':'Conversations','enc-params':'Paramètres',
     'admin-accueil':'Tableau de bord','admin-users':'Encadrants','admin-etudiants':'Étudiants','admin-alldemandes':'Toutes les Demandes',
     'admin-soutenances':'Soutenances','admin-stats':'Statistiques','admin-publications':'Publications','admin-params':'Paramètres'
   };
@@ -787,7 +787,7 @@ async function handleRapportUpload(input) {
   if (!input.files || !input.files[0] || !currentUser) return;
   const file = input.files[0];
   try {
-    // Save rapport info to Firestore (file name only — real storage would use Firebase Storage)
+    // 1. Sauvegarde dans la collection rapports
     await db.collection('rapports').doc(currentUser.uid).set({
       etudiantId: currentUser.uid,
       etudiantName: currentUserData.name,
@@ -797,7 +797,21 @@ async function handleRapportUpload(input) {
       note: null,
       depositDate: firebase.firestore.FieldValue.serverTimestamp()
     });
-    showToast('✅ Rapport "' + file.name + '" déposé !', 'success');
+
+    // 2. Enregistrement automatique dans la conversation pour l'historique
+    if (window.currentChatEncadrantId) {
+      await db.collection('messages').add({
+        etudiantId: currentUser.uid,
+        encadrantId: window.currentChatEncadrantId,
+        senderRole: 'etudiant',
+        senderName: currentUserData.name || 'Étudiant',
+        text: "📁 Rapport déposé : " + file.name,
+        fileName: file.name,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+
+    showToast('✅ Rapport "' + file.name + '" déposé et envoyé à l\'encadrant !', 'success');
     await loadMonRapport();
   } catch (e) { showToast('❌ ' + e.message, 'error'); }
 }
@@ -805,36 +819,69 @@ async function handleRapportUpload(input) {
 async function loadMonRapport() {
   const uploadZone = document.getElementById('rapport-upload-zone');
   const deposited = document.getElementById('rapport-deposited');
+  const chatContainer = document.getElementById('etud-chat-container');
   const kpi = document.getElementById('etud-kpi-rapport');
+  
   if (!currentUser || !uploadZone || !deposited) return;
+
+  // 1. Charger les infos du rapport
   try {
     const doc = await db.collection('rapports').doc(currentUser.uid).get();
     if (doc.exists) {
       const d = doc.data();
-      uploadZone.style.display = 'none'; deposited.style.display = 'block';
-      document.getElementById('rapport-filename').innerHTML = `<a href="#" onclick="showToast('Ouverture du rapport...', 'info')" style="color:var(--navy);text-decoration:underline">${d.fileName || 'rapport.pdf'}</a>`;
+      const isGraded = d.note !== null && d.note !== undefined;
+      
+      uploadZone.style.display = isGraded ? 'block' : 'none';
+      if (isGraded) {
+        const title = uploadZone.querySelector('h3');
+        if (title) title.textContent = 'Renvoyer une nouvelle version du rapport';
+      }
+
+      deposited.style.display = 'block';
+      const fileLink = document.getElementById('rapport-filename');
+      if (fileLink) fileLink.innerHTML = `<a href="#" onclick="showToast('Ouverture du rapport...', 'info')" style="color:var(--navy);text-decoration:underline">${d.fileName || 'rapport.pdf'}</a>`;
+      
       setText('rapport-date', d.depositDate ? d.depositDate.toDate().toLocaleDateString('fr-FR') : '—');
-      if (d.note !== null && d.note !== undefined) {
-        document.getElementById('rapport-note-display').innerHTML = '<span class="badge badge-blue">' + d.note + '/20</span>';
-        if (kpi) kpi.textContent = d.note + '/20';
-      } else {
-        document.getElementById('rapport-note-display').innerHTML = '<span class="badge badge-yellow">En attente de notation</span>';
-        if (kpi) kpi.textContent = 'Oui';
+      
+      const noteDisp = document.getElementById('rapport-note-display');
+      if (noteDisp) {
+        if (isGraded) {
+          noteDisp.innerHTML = '<span class="badge badge-blue">' + d.note + '/20</span>';
+          if (kpi) kpi.textContent = d.note + '/20';
+        } else {
+          noteDisp.innerHTML = '<span class="badge badge-yellow">En attente d\'évaluation</span>';
+          if (kpi) kpi.textContent = 'Oui';
+        }
       }
     } else {
-      uploadZone.style.display = 'block'; deposited.style.display = 'none';
+      uploadZone.style.display = 'block'; 
+      const title = uploadZone.querySelector('h3');
+      if (title) title.textContent = 'Cliquer pour déposer votre rapport (PDF)';
+      deposited.style.display = 'none';
       if (kpi) kpi.textContent = 'Non';
     }
-    const demSnap = await db.collection('demandes').where('etudiantId', '==', currentUser.uid).where('status', '==', 'acceptee').get();
+  } catch (e) { 
+    console.error("Erreur chargement rapport:", e);
+  }
+
+  // 2. Charger la conversation (Indépendant du rapport)
+  try {
+    const demSnap = await db.collection('demandes')
+      .where('etudiantId', '==', currentUser.uid)
+      .where('status', '==', 'acceptee')
+      .get();
+      
     if (!demSnap.empty) {
       window.currentChatEncadrantId = demSnap.docs[0].data().encadrantId;
-      document.getElementById('etud-chat-container').style.display = 'block';
+      if (chatContainer) chatContainer.style.display = 'block';
       if (window.loadEtudChat) window.loadEtudChat();
     } else {
-      document.getElementById('etud-chat-container').style.display = 'none';
+      if (chatContainer) chatContainer.style.display = 'none';
       window.currentChatEncadrantId = null;
     }
-  } catch (e) { if (kpi) kpi.textContent = 'Non'; }
+  } catch (e) {
+    console.error("Erreur chargement chat:", e);
+  }
 }
 
 let etudChatUnsubscribe = null;
@@ -854,10 +901,17 @@ window.loadEtudChat = function() {
       chatC.innerHTML = sortedDocs.map(doc => {
         const d = doc.data();
         const isMe = d.senderRole === 'etudiant';
+        const noteBadge = d.note !== undefined && d.note !== null ? `<span class="badge badge-blue" style="margin-left:8px;font-size:0.75rem;">Note: ${d.note}/20</span>` : '';
+        const fileLink = d.fileName ? `<div style="margin-top:8px;padding:8px;background:rgba(0,0,0,0.05);border-radius:6px;display:flex;align-items:center;gap:8px;font-size:0.85rem;">
+          <span>📄</span>
+          <a href="#" style="color:inherit;text-decoration:underline;">${d.fileName}</a>
+          ${noteBadge}
+        </div>` : '';
         return `<div style="display:flex;flex-direction:column;align-items:${isMe?'flex-end':'flex-start'}">
           <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">${d.senderName}</div>
           <div style="background:${isMe?'var(--blue)':'#fff'};color:${isMe?'#fff':'var(--navy)'};padding:12px 16px;border-radius:12px;border:${isMe?'none':'1px solid var(--gray-border)'};max-width:85%;line-height:1.4">
             ${d.text}
+            ${fileLink}
           </div>
         </div>`;
       }).join('');
@@ -917,6 +971,44 @@ async function loadEncDemandes() {
     if (cntAttente) cntAttente.innerHTML = '<div class="empty-state"><p>Erreur.</p></div>';
   }
 }
+
+function generateChatHTML(sid) {
+  return `<div id="enc-chat-wrap-${sid}" style="display:none;background:#f8f9fa;border-top:1px solid var(--gray-border);border-bottom:1px solid var(--gray-border);height:350px;flex-direction:column;">
+    <div id="enc-chat-msgs-${sid}" style="flex:1;overflow-y:auto;padding:15px;display:flex;flex-direction:column;gap:10px;"></div>
+    <div style="padding:10px;border-top:1px solid var(--gray-border);display:flex;gap:10px;background:#fff;align-items:center;">
+      <div style="display:flex;align-items:center;background:#f0f2f5;border-radius:24px;padding:2px 12px;gap:8px;flex:1;">
+        <input type="file" id="enc-chat-file-${sid}" style="display:none" onchange="window.sendChatFile('${sid}', 'encadrant')">
+        <button onclick="document.getElementById('enc-chat-file-${sid}').click()" style="background:none;font-size:1.4rem;color:var(--text-muted);display:flex;align-items:center;justify-content:center;padding:0;width:28px;height:28px;border:none;">+</button>
+        <input type="text" id="enc-chat-in-${sid}" placeholder="Écrivez un message..." style="flex:1;background:none;border:none;padding:8px 0;outline:none;font-size:0.9rem;" onkeypress="if(event.key==='Enter') window.sendEncChat('${sid}')"/>
+        <button class="btn btn-primary btn-sm" onclick="window.sendEncChat('${sid}')" style="border-radius:18px;padding:6px 16px;">Envoyer</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+window.sendChatFile = async function(sid, role) {
+  const inputId = role === 'etudiant' ? 'etud-chat-file' : 'enc-chat-file-' + sid;
+  const fileInput = document.getElementById(inputId);
+  if (!fileInput || !fileInput.files.length || !currentUser) return;
+  
+  const file = fileInput.files[0];
+  const eId = role === 'etudiant' ? currentUser.uid : sid;
+  const encId = role === 'etudiant' ? window.currentChatEncadrantId : currentUser.uid;
+
+  try {
+    await db.collection('messages').add({
+      etudiantId: eId,
+      encadrantId: encId,
+      senderRole: role,
+      senderName: currentUserData.name || (role === 'etudiant' ? 'Étudiant' : 'Encadrant'),
+      text: "📁 Document envoyé : " + file.name,
+      fileName: file.name,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    fileInput.value = '';
+    showToast('📎 Fichier envoyé !', 'success');
+  } catch (e) { showToast("Erreur d'envoi du fichier", 'error'); }
+};
 
 function generateDemandeHTML(doc) {
   const d = doc.data();
@@ -1003,57 +1095,90 @@ async function loadEncRapports() {
   const container = document.getElementById('enc-rapports-list');
   if (!container || !currentUser) return;
   try {
-    // Get students who have accepted demandes with this encadrant
     const demSnap = await db.collection('demandes')
       .where('encadrantId', '==', currentUser.uid)
       .where('status', '==', 'acceptee').get();
-    if (demSnap.empty) { container.innerHTML = '<div class="empty-state"><div class="empty-icon">📄</div><p>Aucun rapport à évaluer.</p></div>'; return; }
+    
+    if (demSnap.empty) { 
+      container.innerHTML = '<div class="empty-state"><div class="empty-icon">💬</div><p>Aucun étudiant encadré actuellement.</p></div>'; 
+      return; 
+    }
 
-    const studentIds = demSnap.docs.map(d => d.data().etudiantId);
     let html = '';
-    for (const sid of studentIds) {
+    for (const dDoc of demSnap.docs) {
+      const d = dDoc.data();
+      const sid = d.etudiantId;
       const rapDoc = await db.collection('rapports').doc(sid).get();
+      
+      let reportHTML = '';
       if (rapDoc.exists) {
         const r = rapDoc.data();
-        const date = r.depositDate ? r.depositDate.toDate().toLocaleDateString('fr-FR') : '—';
-        html += `<div style="display:flex;flex-direction:column;width:100%;border:1px solid var(--gray-border);border-radius:12px;background:#fff;gap:0;">
-          <div class="opp-card" style="border:none;margin:0;border-radius:12px;">
-            <div class="opp-info">
-              <div class="opp-title">${r.etudiantName} — Rapport</div>
-              <div class="opp-desc"><a href="#" onclick="showToast('Ouverture du fichier...', 'info')" style="color:inherit;text-decoration:underline">${r.fileName}</a></div>
-              <div class="opp-meta"><span>📅 ${date}</span></div>
+        const rDate = r.depositDate ? r.depositDate.toDate().toLocaleDateString('fr-FR') : '—';
+        reportHTML = `
+          <div style="display:flex;align-items:center;background:rgba(26,114,184,0.05);border-radius:10px;padding:12px 16px;margin:12px 0;border:1px dashed var(--blue);">
+            <div style="font-size:1.5rem;margin-right:12px;">📄</div>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:0.85rem;">Rapport : <a href="#" style="text-decoration:underline;">${r.fileName}</a></div>
+              <div style="font-size:0.75rem;color:var(--text-muted)">Déposé le ${rDate}</div>
             </div>
-            <div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">
-              <div class="note-row" style="margin-bottom:0;">
-                <input type="number" min="0" max="20" placeholder="Note" id="note-${sid}" value="${r.note||''}" style="width:70px;text-align:center"/>
-                <span style="font-size:.8rem">/20</span>
-              </div>
-              <button class="btn btn-green btn-sm" onclick="assignNoteFirestore('${sid}','note-${sid}')">Attribuer</button>
-              <button class="btn btn-sm" style="background:#eef2ff;color:var(--blue);border:1px solid var(--blue);" onclick="window.toggleEncChat('${sid}','${r.etudiantName}')">💬 Remarques</button>
+            <div class="note-row" style="margin-right:12px;">
+              <input type="number" min="0" max="20" placeholder="Note" id="note-${sid}" value="${r.note||''}" style="width:65px;padding:6px;"/>
+              <button class="btn btn-green btn-sm" onclick="assignNoteFirestore('${sid}','note-${sid}')">Noter</button>
             </div>
-          </div>
-          <div id="enc-chat-wrap-${sid}" style="display:none;background:#f8f9fa;border-top:1px solid var(--gray-border);border-radius:0 0 12px 12px;height:350px;flex-direction:column;">
-            <div id="enc-chat-msgs-${sid}" style="flex:1;overflow-y:auto;padding:15px;display:flex;flex-direction:column;gap:10px;"></div>
-            <div style="padding:10px;border-top:1px solid var(--gray-border);display:flex;gap:10px;background:#fff;border-radius:0 0 12px 12px;">
-              <input type="text" id="enc-chat-in-${sid}" placeholder="Votre remarque..." style="flex:1;padding:10px;border-radius:6px;border:1px solid var(--gray-border);outline:none;" onkeypress="if(event.key==='Enter') window.sendEncChat('${sid}')"/>
-              <button class="btn btn-primary btn-sm" onclick="window.sendEncChat('${sid}')">Envoyer</button>
-            </div>
-          </div>
-        </div>`;
+          </div>`;
+      } else {
+        reportHTML = `<div style="padding:12px;background:var(--gray-bg);border-radius:10px;font-size:0.8rem;color:var(--text-muted);text-align:center;margin:12px 0;">Aucun rapport déposé pour le moment.</div>`;
       }
+
+      html += `
+        <div class="enc-student-card" id="enc-card-${sid}" style="background:#fff;border:1px solid var(--gray-border);border-radius:16px;margin-bottom:28px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.03);">
+          <div style="padding:18px 24px;display:flex;align-items:center;justify-content:space-between;background:#fff;border-bottom:1px solid var(--gray-border);">
+            <div>
+              <div style="font-weight:800;color:var(--navy);font-size:1.05rem;">${d.etudiantName}</div>
+              <div style="font-size:0.8rem;color:var(--text-muted);">${d.etudiantEmail}</div>
+            </div>
+            <button class="btn btn-sm" style="background:var(--blue);color:#fff;border-radius:20px;padding:8px 18px;" onclick="window.toggleEncChat('${sid}','${d.etudiantName}', this)">💬 Ouvrir la conversation</button>
+          </div>
+          <div style="padding:0 24px;">
+            ${reportHTML}
+          </div>
+          ${generateChatHTML(sid)}
+        </div>`;
     }
-    container.innerHTML = html || '<div class="empty-state"><div class="empty-icon">📄</div><p>Aucun rapport déposé.</p></div>';
-  } catch (e) { container.innerHTML = '<div class="empty-state"><p>Aucun rapport.</p></div>'; }
+    container.innerHTML = html;
+  } catch (e) { container.innerHTML = '<div class="empty-state"><p>Erreur de chargement.</p></div>'; }
 }
 
 window.encChatUnsubscribes = window.encChatUnsubscribes || {};
-window.toggleEncChat = function(sid, etudName) {
+window.toggleEncChat = function(sid, etudName, btn) {
   const wrap = document.getElementById('enc-chat-wrap-' + sid);
-  if (wrap.style.display === 'flex') {
+  if (!wrap) return;
+  const isOpen = wrap.style.display === 'flex';
+  const allCards = document.querySelectorAll('.enc-student-card');
+  
+  if (isOpen) {
+    // Fermer
     wrap.style.display = 'none';
+    if (btn) {
+      btn.innerHTML = '💬 Ouvrir la conversation';
+      btn.style.background = 'var(--blue)';
+    }
+    // Tout réafficher
+    allCards.forEach(c => c.style.display = 'block');
+    
     if (window.encChatUnsubscribes[sid]) { window.encChatUnsubscribes[sid](); delete window.encChatUnsubscribes[sid]; }
   } else {
+    // Ouvrir
     wrap.style.display = 'flex';
+    if (btn) {
+      btn.innerHTML = '❌ Fermer la conversation';
+      btn.style.background = 'var(--red)';
+    }
+    // Masquer les autres
+    allCards.forEach(c => {
+      if (c.id !== 'enc-card-' + sid) c.style.display = 'none';
+    });
+    
     const msgsContainer = document.getElementById('enc-chat-msgs-' + sid);
     if (!currentUser) return;
     window.encChatUnsubscribes[sid] = db.collection('messages')
@@ -1068,10 +1193,17 @@ window.toggleEncChat = function(sid, etudName) {
         msgsContainer.innerHTML = sortedDocs.map(doc => {
           const d = doc.data();
           const isMe = d.senderRole === 'encadrant';
+          const noteBadge = d.note !== undefined && d.note !== null ? `<span class="badge badge-blue" style="margin-left:8px;font-size:0.75rem;">Note: ${d.note}/20</span>` : '';
+          const fileLink = d.fileName ? `<div style="margin-top:8px;padding:8px;background:rgba(0,0,0,0.05);border-radius:6px;display:flex;align-items:center;gap:8px;font-size:0.85rem;">
+            <span>📄</span>
+            <a href="#" style="color:inherit;text-decoration:underline;">${d.fileName}</a>
+            ${noteBadge}
+          </div>` : '';
           return `<div style="display:flex;flex-direction:column;align-items:${isMe?'flex-end':'flex-start'}">
             <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">${d.senderName}</div>
             <div style="background:${isMe?'var(--blue)':'#fff'};color:${isMe?'#fff':'var(--navy)'};padding:12px 16px;border-radius:12px;border:${isMe?'none':'1px solid var(--gray-border)'};max-width:85%;line-height:1.4">
               ${d.text}
+              ${fileLink}
             </div>
           </div>`;
         }).join('');
@@ -1102,8 +1234,26 @@ async function assignNoteFirestore(studentId, inputId) {
   const note = parseFloat(inp.value);
   if (isNaN(note) || note < 0 || note > 20) { showToast('⚠️ Note entre 0 et 20.', 'warning'); return; }
   try {
+    // 1. Mise à jour de la fiche rapport principale
+    const rapSnap = await db.collection('rapports').doc(studentId).get();
+    let currentFileName = "";
+    if (rapSnap.exists) {
+      currentFileName = rapSnap.data().fileName;
+    }
     await db.collection('rapports').doc(studentId).update({ note, status: 'note' });
-    showToast('✅ Note ' + note + '/20 attribuée !', 'success');
+
+    // 2. Mise à jour des messages de chat correspondants à ce fichier
+    if (currentFileName) {
+      const msgSnap = await db.collection('messages')
+        .where('etudiantId', '==', studentId)
+        .where('fileName', '==', currentFileName).get();
+      
+      const updates = [];
+      msgSnap.forEach(doc => updates.push(doc.ref.update({ note })));
+      if (updates.length > 0) await Promise.all(updates);
+    }
+
+    showToast('✅ Note ' + note + '/20 attribuée ! Elle apparaît aussi dans le chat.', 'success');
   } catch (e) { showToast('❌ ' + e.message, 'error'); }
 }
 

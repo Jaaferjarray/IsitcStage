@@ -172,8 +172,7 @@
               class="nav-icon">🏠</span><span>Accueil</span></a>
           <a onclick="showSection('etud-encadrants','sidebar-etudiant')"><span
               class="nav-icon">👥</span><span>Encadrants</span></a>
-          <a onclick="showSection('etud-rapport','sidebar-etudiant')"><span class="nav-icon">📄</span><span>Mon
-              Rapport</span></a>
+          <a onclick="showSection('etud-rapport','sidebar-etudiant')"><span class="nav-icon">💬</span><span>Conversations</span></a>
           <a onclick="showSection('etud-soutenance','sidebar-etudiant')"><span class="nav-icon">📅</span><span>Ma
               Soutenance</span><span class="nav-badge" id="badge-etud-soutenance">+1</span></a>
           <a onclick="showSection('etud-demandes','sidebar-etudiant')"><span class="nav-icon">📬</span><span>Mes
@@ -268,8 +267,8 @@
         <!-- ETUD: RAPPORT -->
         <div id="etud-rapport" class="dash-section">
           <div class="dash-header">
-            <h1>Mon Rapport de Stage</h1>
-            <p>Déposez votre rapport pour évaluation</p>
+            <h1>Conversations</h1>
+            <p>Discutez avec votre encadrant et gérez votre rapport</p>
           </div>
           <div id="rapport-upload-zone">
             <div class="upload-zone" onclick="document.getElementById('rapport-file-input').click()">
@@ -303,11 +302,13 @@
               <div id="etud-chat-messages"
                 style="flex:1;padding:20px;overflow-y:auto;background:#f8f9fa;display:flex;flex-direction:column;gap:12px;">
               </div>
-              <div style="padding:15px;background:#fff;border-top:1px solid var(--gray-border);display:flex;gap:10px;">
-                <input type="text" id="etud-chat-input" placeholder="Écrivez un message ou une remarque..."
-                  style="flex:1;padding:12px;border:1px solid var(--gray-border);border-radius:8px;outline:none;"
-                  onkeypress="if(event.key==='Enter') sendEtudChat()" />
-                <button class="btn btn-primary" onclick="sendEtudChat()">Envoyer</button>
+              <div class="chat-input-area" style="display:flex;align-items:center;background:#f0f2f5;border-radius:24px;padding:5px 15px;gap:10px;">
+                <input type="file" id="etud-chat-file" style="display:none" onchange="window.sendChatFile(null, 'etudiant')">
+                <button onclick="document.getElementById('etud-chat-file').click()" style="background:none;font-size:1.5rem;color:var(--text-muted);display:flex;align-items:center;justify-content:center;padding:0;width:30px;height:30px;border:none;">+</button>
+                <input type="text" id="etud-chat-input" placeholder="Écrivez un message..."
+                  style="flex:1;background:none;border:none;padding:10px 0;outline:none;font-size:0.95rem;"
+                  onkeypress="if(event.key==='Enter') sendEtudChat()">
+                <button class="btn btn-primary" onclick="window.sendEtudChat()" style="border-radius:20px;padding:8px 20px;">Envoyer</button>
               </div>
             </div>
           </div>
@@ -430,7 +431,7 @@
           <a onclick="showSection('enc-demandes','sidebar-encadrant')"><span class="nav-icon">📬</span><span>Demandes en
               attente</span><span class="nav-badge" id="badge-enc-demandes">+1</span></a>
           <a onclick="showSection('enc-rapports','sidebar-encadrant')"><span
-              class="nav-icon">📄</span><span>Rapports</span><span class="nav-badge" id="badge-enc-rapports">+1</span></a>
+              class="nav-icon">💬</span><span>Conversations</span><span class="nav-badge" id="badge-enc-rapports">+1</span></a>
           <a onclick="showSection('enc-params','sidebar-encadrant')"><span
               class="nav-icon">⚙️</span><span>Paramètres</span></a>
         </nav>
