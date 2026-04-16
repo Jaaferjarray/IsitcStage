@@ -21,6 +21,36 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 try { firebase.analytics(); } catch (e) {}
 
+/* ═══════════════════════════════════════
+   CLOUDINARY CONFIGURATION (À REMPLIR)
+   ═══════════════════════════════════════ */
+// Note: Utilisez un "Unsigned Upload Preset" dans vos paramètres Cloudinary
+const CLOUDINARY_CLOUD_NAME = "drghtmwoz"; // Mis à jour avec votre Cloud Name
+const CLOUDINARY_UPLOAD_PRESET = "chat_upload"; // Mis à jour d'après votre console Cloudinary
+
+async function uploadToCloudinary(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+  try {
+    const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`, {
+      method: 'POST',
+      body: formData
+    });
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error?.message || 'Erreur lors du transfert Cloudinary');
+    }
+    const data = await response.json();
+    return data.secure_url;
+  } catch (e) {
+    console.error('Cloudinary Error:', e);
+    throw e;
+  }
+}
+
+
 // ─── STATE ───
 let currentUser = null;
 let currentUserData = null;
@@ -786,19 +816,29 @@ async function loadMesDemandes() {
 async function handleRapportUpload(input) {
   if (!input.files || !input.files[0] || !currentUser) return;
   const file = input.files[0];
+  
+  // Show loading
+  showToast('⏳ Téléchargement du rapport...', 'info');
+  const btn = document.querySelector('#rapport-upload-zone .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Transfert en cours...'; }
+
   try {
-    // 1. Sauvegarde dans la collection rapports
+    // 1. Upload vers Cloudinary
+    const fileUrl = await uploadToCloudinary(file);
+
+    // 2. Sauvegarde dans la collection rapports
     await db.collection('rapports').doc(currentUser.uid).set({
       etudiantId: currentUser.uid,
       etudiantName: currentUserData.name,
       fileName: file.name,
+      fileUrl: fileUrl, // On stocke l'URL réelle
       fileSize: file.size,
       status: 'en_attente',
       note: null,
       depositDate: firebase.firestore.FieldValue.serverTimestamp()
     });
 
-    // 2. Enregistrement automatique dans la conversation pour l'historique
+    // 3. Enregistrement automatique dans la conversation pour l'historique
     if (window.currentChatEncadrantId) {
       await db.collection('messages').add({
         etudiantId: currentUser.uid,
@@ -807,13 +847,18 @@ async function handleRapportUpload(input) {
         senderName: currentUserData.name || 'Étudiant',
         text: "📁 Rapport déposé : " + file.name,
         fileName: file.name,
+        fileUrl: fileUrl, // On stocke l'URL réelle
         timestamp: firebase.firestore.FieldValue.serverTimestamp()
       });
     }
 
-    showToast('✅ Rapport "' + file.name + '" déposé et envoyé à l\'encadrant !', 'success');
+    showToast('✅ Rapport "' + file.name + '" déposé avec succès !', 'success');
     await loadMonRapport();
-  } catch (e) { showToast('❌ ' + e.message, 'error'); }
+  } catch (e) { 
+    showToast('❌ Erreur : ' + e.message, 'error'); 
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📤 Déposer le rapport'; }
+  }
 }
 
 async function loadMonRapport() {
@@ -839,7 +884,7 @@ async function loadMonRapport() {
 
       deposited.style.display = 'block';
       const fileLink = document.getElementById('rapport-filename');
-      if (fileLink) fileLink.innerHTML = `<a href="#" onclick="showToast('Ouverture du rapport...', 'info')" style="color:var(--navy);text-decoration:underline">${d.fileName || 'rapport.pdf'}</a>`;
+      if (fileLink) fileLink.innerHTML = `<a href="${d.fileUrl || '#'}" target="_blank" style="color:var(--navy);text-decoration:underline">${d.fileName || 'rapport.pdf'}</a>`;
       
       setText('rapport-date', d.depositDate ? d.depositDate.toDate().toLocaleDateString('fr-FR') : '—');
       
@@ -902,9 +947,9 @@ window.loadEtudChat = function() {
         const d = doc.data();
         const isMe = d.senderRole === 'etudiant';
         const noteBadge = d.note !== undefined && d.note !== null ? `<span class="badge badge-blue" style="margin-left:8px;font-size:0.75rem;">Note: ${d.note}/20</span>` : '';
-        const fileLink = d.fileName ? `<div style="margin-top:8px;padding:8px;background:rgba(0,0,0,0.05);border-radius:6px;display:flex;align-items:center;gap:8px;font-size:0.85rem;">
+        const fileLink = d.fileUrl ? `<div style="margin-top:8px;padding:8px;background:rgba(0,0,0,0.05);border-radius:6px;display:flex;align-items:center;gap:8px;font-size:0.85rem;">
           <span>📄</span>
-          <a href="#" style="color:inherit;text-decoration:underline;">${d.fileName}</a>
+          <a href="${d.fileUrl}" target="_blank" style="color:inherit;text-decoration:underline;">${d.fileName || 'Document'}</a>
           ${noteBadge}
         </div>` : '';
         return `<div style="display:flex;flex-direction:column;align-items:${isMe?'flex-end':'flex-start'}">
@@ -995,7 +1040,13 @@ window.sendChatFile = async function(sid, role) {
   const eId = role === 'etudiant' ? currentUser.uid : sid;
   const encId = role === 'etudiant' ? window.currentChatEncadrantId : currentUser.uid;
 
+  showToast('⏳ Envoi du fichier...', 'info');
+
   try {
+    // 1. Upload vers Cloudinary
+    const fileUrl = await uploadToCloudinary(file);
+
+    // 2. Enregistrement dans Firestore
     await db.collection('messages').add({
       etudiantId: eId,
       encadrantId: encId,
@@ -1003,11 +1054,14 @@ window.sendChatFile = async function(sid, role) {
       senderName: currentUserData.name || (role === 'etudiant' ? 'Étudiant' : 'Encadrant'),
       text: "📁 Document envoyé : " + file.name,
       fileName: file.name,
+      fileUrl: fileUrl, // On stocke l'URL réelle
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
     });
     fileInput.value = '';
-    showToast('📎 Fichier envoyé !', 'success');
-  } catch (e) { showToast("Erreur d'envoi du fichier", 'error'); }
+    showToast('📎 Fichier envoyé avec succès !', 'success');
+  } catch (e) { 
+    showToast("Erreur d'envoi : " + e.message, 'error'); 
+  }
 };
 
 function generateDemandeHTML(doc) {
@@ -1118,7 +1172,7 @@ async function loadEncRapports() {
           <div style="display:flex;align-items:center;background:rgba(26,114,184,0.05);border-radius:10px;padding:12px 16px;margin:12px 0;border:1px dashed var(--blue);">
             <div style="font-size:1.5rem;margin-right:12px;">📄</div>
             <div style="flex:1">
-              <div style="font-weight:600;font-size:0.85rem;">Rapport : <a href="#" style="text-decoration:underline;">${r.fileName}</a></div>
+              <div style="font-weight:600;font-size:0.85rem;">Rapport : <a href="${r.fileUrl || '#'}" target="_blank" style="text-decoration:underline;">${r.fileName}</a></div>
               <div style="font-size:0.75rem;color:var(--text-muted)">Déposé le ${rDate}</div>
             </div>
             <div class="note-row" style="margin-right:12px;">
@@ -1194,9 +1248,9 @@ window.toggleEncChat = function(sid, etudName, btn) {
           const d = doc.data();
           const isMe = d.senderRole === 'encadrant';
           const noteBadge = d.note !== undefined && d.note !== null ? `<span class="badge badge-blue" style="margin-left:8px;font-size:0.75rem;">Note: ${d.note}/20</span>` : '';
-          const fileLink = d.fileName ? `<div style="margin-top:8px;padding:8px;background:rgba(0,0,0,0.05);border-radius:6px;display:flex;align-items:center;gap:8px;font-size:0.85rem;">
+          const fileLink = d.fileUrl ? `<div style="margin-top:8px;padding:8px;background:rgba(0,0,0,0.05);border-radius:6px;display:flex;align-items:center;gap:8px;font-size:0.85rem;">
             <span>📄</span>
-            <a href="#" style="color:inherit;text-decoration:underline;">${d.fileName}</a>
+            <a href="${d.fileUrl}" target="_blank" style="color:inherit;text-decoration:underline;">${d.fileName || 'Document'}</a>
             ${noteBadge}
           </div>` : '';
           return `<div style="display:flex;flex-direction:column;align-items:${isMe?'flex-end':'flex-start'}">
