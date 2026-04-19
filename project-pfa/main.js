@@ -406,7 +406,10 @@ async function loadEtudiantStats() {
     if (rapSnap.exists) {
       setText('etud-kpi-rapport', 'Oui');
       const d = rapSnap.data();
-      setText('etud-kpi-note', d.note || '—');
+      setText('etud-kpi-note', (d.note !== null && d.note !== undefined) ? d.note : '—');
+    } else {
+      setText('etud-kpi-rapport', 'Non');
+      setText('etud-kpi-note', '—');
     }
   } catch (e) { console.error('loadEtudiantStats:', e); }
 }
@@ -622,7 +625,7 @@ async function loadAdminStats() {
     setText('stat-total-encadrants', encSnap.size.toString());
 
     // fetch limit
-    let limit = 10;
+    let limit = 5;
     try {
       const setDoc = await db.collection('settings').doc('global').get();
       if (setDoc.exists && setDoc.data().encadrantLimit) {
@@ -682,11 +685,21 @@ async function loadEncadrantCards() {
     const existingReqs = reqSnap.docs.map(doc => doc.data());
     const hasAccepted = existingReqs.some(r => r.status === 'acceptee');
 
+    let limit = 5;
+    try {
+      const setDoc = await db.collection('settings').doc('global').get();
+      if (setDoc.exists && setDoc.data().encadrantLimit) {
+        limit = setDoc.data().encadrantLimit;
+      }
+    } catch (e) {}
+
     grid.innerHTML = encSnap.docs.map(doc => {
       const d = doc.data();
       const initials = (d.name || 'EN').split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2);
       
       const req = existingReqs.find(r => r.encadrantId === doc.id);
+      const isFull = (d.nbEtudiants || 0) >= limit;
+
       let btnHTML = `<button class="btn btn-orange btn-full" onclick="sendDemande('${doc.id}','${d.name}')">📩 Envoyer une demande</button>`;
       
       if (req) {
@@ -694,6 +707,8 @@ async function loadEncadrantCards() {
         else if (req.status === 'acceptee') btnHTML = `<button class="btn btn-full" disabled style="background:#d1fae5;color:var(--green);border:1px solid #a7f3d0;cursor:not-allowed">✅ Acceptée</button>`;
         else if (req.status === 'refusee') btnHTML = `<button class="btn btn-full" disabled style="background:#fee2e2;color:var(--red);border:1px solid #fecaca;cursor:not-allowed">❌ Refusée</button>`;
       } else if (hasAccepted) {
+        btnHTML = `<button class="btn btn-full" disabled style="background:#e9ecef;color:var(--text-muted);border:1px solid var(--gray-border);cursor:not-allowed">🚫 Indisponible</button>`;
+      } else if (isFull) {
         btnHTML = `<button class="btn btn-full" disabled style="background:#e9ecef;color:var(--text-muted);border:1px solid var(--gray-border);cursor:not-allowed">🚫 Indisponible</button>`;
       }
 
@@ -892,10 +907,12 @@ async function loadMonRapport() {
       if (noteDisp) {
         if (isGraded) {
           noteDisp.innerHTML = '<span class="badge badge-blue">' + d.note + '/20</span>';
-          if (kpi) kpi.textContent = d.note + '/20';
+          setText('etud-kpi-note', d.note);
+          if (kpi) kpi.textContent = 'Oui';
         } else {
           noteDisp.innerHTML = '<span class="badge badge-yellow">En attente d\'évaluation</span>';
           if (kpi) kpi.textContent = 'Oui';
+          setText('etud-kpi-note', '—');
         }
       }
     } else {
@@ -1085,7 +1102,7 @@ function generateDemandeHTML(doc) {
 async function handleDemandeAction(demandeId, newStatus) {
   try {
     if (newStatus === 'acceptee') {
-      let limit = 10;
+      let limit = 5;
       try {
         const setDoc = await db.collection('settings').doc('global').get();
         if (setDoc.exists && setDoc.data().encadrantLimit) {
